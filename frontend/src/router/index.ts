@@ -37,6 +37,11 @@ const router = createRouter({
       name: 'character-edit',
       component: () => import('@/views/CharacterFormView.vue'),
     },
+    {
+      path: '/chat/:conversationId',
+      name: 'chat',
+      component: () => import('@/views/ChatView.vue'),
+    },
   ],
 })
 

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "dev-secret-change-me-in-production"
 
+    llm_api_key: str = ""
+    llm_base_url: str = "https://api.deepseek.com"
+    llm_model: str = "deepseek-chat"
+    llm_max_tokens: int = 2048
+    llm_temperature: float = 0.85
+
     @property
     def database_url(self) -> str:
         return (

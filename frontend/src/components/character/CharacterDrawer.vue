@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import type { Character } from '@/types/world'
 import { X, MessageCircle } from 'lucide-vue-next'
+import { useChatStore } from '@/stores/chatStore'
 import FoldableSection from '@/components/common/FoldableSection.vue'
 import TagBadge from '@/components/common/TagBadge.vue'
 
-defineProps<{
+const props = defineProps<{
   character: Character
   open: boolean
 }>()
@@ -12,6 +14,17 @@ defineProps<{
 defineEmits<{
   close: []
 }>()
+
+const router = useRouter()
+const chatStore = useChatStore()
+
+async function startChat() {
+  const convId = await chatStore.createConversation(
+    props.character.id,
+    props.character.world_id,
+  )
+  router.push({ name: 'chat', params: { conversationId: convId } })
+}
 </script>
 
 <template>
@@ -83,9 +96,8 @@ defineEmits<{
 
           <div class="sticky bottom-0 p-4 border-t border-white/[0.06] bg-bg-surface">
             <button
-              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent text-bg-deep font-medium opacity-50 cursor-not-allowed"
-              disabled
-              title="对话功能开发中"
+              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent text-bg-deep font-medium hover:bg-accent-hover transition-colors"
+              @click="startChat"
             >
               <MessageCircle :size="16" />
               开始对话
