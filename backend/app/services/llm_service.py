@@ -1,26 +1,48 @@
+import logging
 from collections.abc import AsyncGenerator
 
-from openai import AsyncOpenAI
+from openai import APIConnectionError, APIStatusError, AsyncOpenAI, RateLimitError
 
 from app.core.config import settings
+from app.core.exceptions import LLMError, LLMStreamError
+
+logger = logging.getLogger(__name__)
 
 client = AsyncOpenAI(
     api_key=settings.llm_api_key,
     base_url=settings.llm_base_url,
+    timeout=60.0,
 )
 
 
 async def chat_stream(
     messages: list[dict[str, str]],
 ) -> AsyncGenerator[str, None]:
-    response = await client.chat.completions.create(
-        model=settings.llm_model,
-        messages=messages,
-        max_tokens=settings.llm_max_tokens,
-        temperature=settings.llm_temperature,
-        stream=True,
-    )
-    async for chunk in response:
-        delta = chunk.choices[0].delta
-        if delta.content:
-            yield delta.content
+    model = settings.llm_model
+    try:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=settings.llm_max_tokens,
+            temperature=settings.llm_temperature,
+            stream=True,
+        )
+    except RateLimitError as e:
+        logger.error("LLM rate limited: model=%s, %s", model, e)
+        raise LLMError("模型调用频率超限，请稍后重试", model=model, status_code=429) from e
+    except APIConnectionError as e:
+        logger.error("LLM connection failed: model=%s, %s", model, e)
+        raise LLMError("无法连接到模型服务", model=model) from e
+    except APIStatusError as e:
+        logger.error("LLM API error: model=%s, status=%d, %s", model, e.status_code, e)
+        raise LLMError(
+            f"模型服务返回错误 ({e.status_code})", model=model, status_code=e.status_code
+        ) from e
+
+    try:
+        async for chunk in response:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+    except Exception as e:
+        logger.error("LLM stream interrupted: model=%s, %s", model, e)
+        raise LLMStreamError("模型生成中断", model=model) from e

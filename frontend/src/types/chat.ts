@@ -15,6 +15,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   created_at: string
+  error?: boolean
 }
 
 export interface ChatStartResponse {

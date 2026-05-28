@@ -55,6 +55,12 @@ defineEmits<{
         <FoldableSection v-if="character.relationships" title="关系">
           {{ character.relationships }}
         </FoldableSection>
+        <FoldableSection v-if="character.language_style" title="说话风格">
+          {{ character.language_style }}
+        </FoldableSection>
+        <FoldableSection v-if="character.knowledge" title="已知信息">
+          {{ character.knowledge }}
+        </FoldableSection>
       </div>
 
       <div v-if="world" class="mt-6 pt-4 border-t border-white/[0.06]">

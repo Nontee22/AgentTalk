@@ -5,10 +5,12 @@ import { PanelRight } from 'lucide-vue-next'
 import { useChatStore } from '@/stores/chatStore'
 import { getCharacter } from '@/api/characters'
 import { getWorld } from '@/api/worlds'
+import { renderMarkdown } from '@/utils/markdown'
 import ConversationList from '@/components/chat/ConversationList.vue'
 import ChatMessageComp from '@/components/chat/ChatMessage.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import CharacterPanel from '@/components/layout/CharacterPanel.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import type { Character, WorldBook } from '@/types/world'
 
 const route = useRoute()
@@ -19,8 +21,12 @@ const character = ref<Character | null>(null)
 const world = ref<WorldBook | null>(null)
 const showPanel = ref(true)
 const messagesContainer = ref<HTMLDivElement>()
+const deleteConfirmOpen = ref(false)
+const pendingDeleteId = ref<string | null>(null)
 
 const conversationId = computed(() => route.params.conversationId as string)
+
+const streamingHtml = computed(() => renderMarkdown(store.streamingContent))
 
 function scrollToBottom() {
   nextTick(() => {
@@ -75,7 +81,15 @@ function handleSend(content: string) {
 }
 
 async function handleDeleteConversation(id: string) {
-  await store.removeConversation(id)
+  pendingDeleteId.value = id
+  deleteConfirmOpen.value = true
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteId.value) return
+  await store.removeConversation(pendingDeleteId.value)
+  deleteConfirmOpen.value = false
+  pendingDeleteId.value = null
   if (store.conversations.length) {
     router.push({ name: 'chat', params: { conversationId: store.conversations[0].id } })
   } else {
@@ -102,7 +116,7 @@ function handleNewChat() {
       <div class="flex items-center justify-between px-4 py-2 border-b border-white/[0.06] bg-bg-deep">
         <div class="flex items-center gap-2">
           <span v-if="world" class="text-text-muted text-xs">{{ world.name }}</span>
-          <span v-if="world && character" class="text-text-muted text-xs">·</span>
+          <span v-if="world && character" class="text-text-muted text-xs">&middot;</span>
           <span v-if="character" class="text-text-primary text-sm font-serif">{{ character.name }}</span>
         </div>
         <button
@@ -121,6 +135,7 @@ function handleNewChat() {
             :message="msg"
             :character-name="character?.name"
             :character-avatar="character?.avatar"
+            @retry="store.retryLastMessage"
           />
 
           <div v-if="store.streaming" class="flex gap-3 px-4 py-2">
@@ -136,8 +151,10 @@ function handleNewChat() {
             </div>
             <div class="max-w-[70%]">
               <div class="text-[10px] text-text-muted mb-1 font-serif">{{ character?.name }}</div>
-              <div class="rounded-xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed bg-bg-surface text-text-primary border border-white/[0.06] whitespace-pre-wrap">
-                {{ store.streamingContent }}<span class="inline-block w-0.5 h-4 bg-accent animate-pulse ml-0.5 align-text-bottom" />
+              <div
+                class="rounded-xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed bg-bg-surface text-text-primary border border-white/[0.06] markdown-body"
+              >
+                <span v-html="streamingHtml" /><span class="inline-block w-0.5 h-4 bg-accent animate-pulse ml-0.5 align-text-bottom" />
               </div>
             </div>
           </div>
@@ -163,5 +180,31 @@ function handleNewChat() {
       :world="world"
       @close="showPanel = false"
     />
+    <ConfirmDialog
+      :open="deleteConfirmOpen"
+      title="删除对话"
+      message="确定要删除这个对话吗？此操作不可恢复。"
+      confirm-label="删除"
+      @confirm="confirmDelete"
+      @cancel="deleteConfirmOpen = false"
+    />
   </div>
 </template>
+
+<style scoped>
+.markdown-body :deep(p) { margin-bottom: 0.5em; }
+.markdown-body :deep(p:last-child) { margin-bottom: 0; }
+.markdown-body :deep(pre) {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.markdown-body :deep(code) { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85em; }
+.markdown-body :deep(:not(pre) > code) {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+</style>

@@ -116,3 +116,43 @@ def test_delete_conversation_not_found(client):
     fake_id = uuid.uuid4()
     resp = client.delete(f"/api/chat/{fake_id}")
     assert resp.status_code == 404
+
+
+def test_send_empty_content(client):
+    world_resp = client.post("/api/worlds", json={"name": "Empty Msg World"})
+    world_id = world_resp.json()["id"]
+    char_resp = client.post(
+        f"/api/worlds/{world_id}/characters",
+        json={"name": "Empty Char"},
+    )
+    char_id = char_resp.json()["id"]
+    start_resp = client.post(
+        "/api/chat/start",
+        json={"character_id": char_id, "world_id": world_id},
+    )
+    conv_id = start_resp.json()["conversation_id"]
+    resp = client.post(f"/api/chat/{conv_id}/send", json={"content": ""})
+    assert resp.status_code == 422
+
+
+def test_send_whitespace_only(client):
+    world_resp = client.post("/api/worlds", json={"name": "WS Msg World"})
+    world_id = world_resp.json()["id"]
+    char_resp = client.post(
+        f"/api/worlds/{world_id}/characters",
+        json={"name": "WS Char"},
+    )
+    char_id = char_resp.json()["id"]
+    start_resp = client.post(
+        "/api/chat/start",
+        json={"character_id": char_id, "world_id": world_id},
+    )
+    conv_id = start_resp.json()["conversation_id"]
+    resp = client.post(f"/api/chat/{conv_id}/send", json={"content": "   "})
+    assert resp.status_code == 422
+
+
+def test_stop_no_active_stream(client):
+    fake_id = uuid.uuid4()
+    resp = client.post(f"/api/chat/{fake_id}/stop")
+    assert resp.status_code == 404

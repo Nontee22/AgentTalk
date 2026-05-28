@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import LLMError
 from app.schemas.chat import (
     ChatStartResponse,
     ConversationCreate,
@@ -15,6 +17,8 @@ from app.schemas.chat import (
 )
 from app.schemas.common import PaginatedResponse
 from app.services import chat_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -51,8 +55,13 @@ async def send_message(
                 yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         except ValueError as e:
+            logger.warning("Chat value error: conv=%s, %s", conversation_id, e)
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+        except LLMError as e:
+            logger.error("LLM error: conv=%s, model=%s, %s", conversation_id, e.model, e.message)
+            yield f"data: {json.dumps({'error': e.message}, ensure_ascii=False)}\n\n"
         except Exception as e:
+            logger.exception("Unexpected error in chat stream: conv=%s", conversation_id)
             yield f"data: {json.dumps({'error': 'LLM 调用失败，请稍后重试'}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
@@ -64,6 +73,18 @@ async def send_message(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/{conversation_id}/stop")
+async def stop_generation(
+    conversation_id: uuid.UUID,
+):
+    from app.services.stream_registry import cancel_stream
+
+    cancelled = cancel_stream(conversation_id)
+    if not cancelled:
+        raise HTTPException(status_code=404, detail="No active stream found")
+    return {"status": "stopped"}
 
 
 @router.get("/conversations", response_model=list[ConversationSummary])

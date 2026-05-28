@@ -1,6 +1,7 @@
 from app.models.character import Character
 from app.models.message import Message
 from app.models.world import WorldBook
+from app.services.token_counter import estimate_tokens
 
 
 def build_system_prompt(world: WorldBook, character: Character) -> str:
@@ -13,7 +14,7 @@ def build_system_prompt(world: WorldBook, character: Character) -> str:
         sections.append(f"【世界规则】\n{world.rules}")
 
     if world.factions:
-        factions_text = "、".join(world.factions)
+        factions_text = "\n".join(f"- {f}" for f in world.factions)
         sections.append(f"【势力与阵营】\n{factions_text}")
 
     if world.lore:
@@ -52,12 +53,25 @@ def build_messages(
     history: list[Message],
     user_input: str,
     max_history: int = 20,
+    max_context_tokens: int = 6000,
 ) -> list[dict[str, str]]:
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
 
-    recent = history[-max_history:]
-    for msg in recent:
-        messages.append({"role": msg.role, "content": msg.content})
+    system_tokens = estimate_tokens(system_prompt)
+    user_tokens = estimate_tokens(user_input)
+    budget = max_context_tokens - system_tokens - user_tokens
 
+    selected: list[dict[str, str]] = []
+    used_tokens = 0
+
+    for msg in reversed(history[-max_history:]):
+        msg_tokens = msg.token_count or estimate_tokens(msg.content)
+        if used_tokens + msg_tokens > budget:
+            break
+        selected.append({"role": msg.role, "content": msg.content})
+        used_tokens += msg_tokens
+
+    selected.reverse()
+    messages.extend(selected)
     messages.append({"role": "user", "content": user_input})
     return messages

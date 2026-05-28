@@ -7,7 +7,9 @@ import {
   getMessages,
   deleteConversation,
   sendMessageSSE,
+  stopGeneration,
 } from '@/api/chat'
+import { useToast } from '@/composables/useToast'
 import type { ChatMessage, ConversationSummary } from '@/types/chat'
 
 export const useChatStore = defineStore('chat', () => {
@@ -19,6 +21,7 @@ export const useChatStore = defineStore('chat', () => {
   const loading = ref(false)
 
   let abortController: AbortController | null = null
+  const { showToast } = useToast()
 
   async function fetchConversations() {
     conversations.value = await getConversations()
@@ -82,19 +85,39 @@ export const useChatStore = defineStore('chat', () => {
         messages.value.push({
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: `[错误] ${error}`,
+          content: error,
           created_at: new Date().toISOString(),
+          error: true,
         })
         streamingContent.value = ''
         streaming.value = false
       },
+      (attempt) => {
+        showToast(`连接断开，正在重试 (${attempt}/3)...`, 'info')
+      },
     )
+  }
+
+  function retryLastMessage() {
+    const errorIdx = messages.value.map((m) => m.error).lastIndexOf(true)
+    if (errorIdx === -1) return
+
+    messages.value.splice(errorIdx, 1)
+
+    const lastUserMsg = [...messages.value].reverse().find((m) => m.role === 'user')
+    if (!lastUserMsg) return
+
+    messages.value = messages.value.filter((m) => m.id !== lastUserMsg.id)
+    sendMessage(lastUserMsg.content)
   }
 
   function stopStreaming() {
     if (abortController) {
       abortController.abort()
       abortController = null
+    }
+    if (currentConversationId.value) {
+      stopGeneration(currentConversationId.value).catch(() => {})
     }
     if (streamingContent.value) {
       messages.value.push({
@@ -128,6 +151,7 @@ export const useChatStore = defineStore('chat', () => {
     loadMessages,
     createConversation,
     sendMessage,
+    retryLastMessage,
     stopStreaming,
     removeConversation,
   }

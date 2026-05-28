@@ -2,6 +2,7 @@
 import type { ConversationSummary } from '@/types/chat'
 import { MessageCircle, Trash2, Search } from 'lucide-vue-next'
 import { ref } from 'vue'
+import { formatRelativeTime } from '@/utils/formatTime'
 
 defineProps<{
   conversations: ConversationSummary[]
@@ -73,6 +74,9 @@ const searchQuery = ref('')
             </div>
             <p class="text-text-muted text-[10px] truncate mt-0.5">
               {{ conv.last_message || '...' }}
+            </p>
+            <p class="text-text-muted text-[9px] mt-0.5">
+              {{ formatRelativeTime(conv.updated_at) }}
             </p>
           </div>
         </div>
