@@ -1,0 +1,59 @@
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+
+class CharacterCreate(BaseModel):
+    name: str = Field(..., max_length=100)
+    avatar: str | None = None
+    identity: str | None = None
+    personality: str | None = None
+    background: str | None = None
+    relationships: str | None = None
+    language_style: str | None = None
+    knowledge: str | None = None
+    greeting: str | None = None
+    tags: list[str] | None = None
+
+
+class CharacterUpdate(BaseModel):
+    name: str | None = Field(None, max_length=100)
+    avatar: str | None = None
+    identity: str | None = None
+    personality: str | None = None
+    background: str | None = None
+    relationships: str | None = None
+    language_style: str | None = None
+    knowledge: str | None = None
+    greeting: str | None = None
+    tags: list[str] | None = None
+
+
+class CharacterSummary(BaseModel):
+    id: uuid.UUID
+    name: str
+    avatar: str | None
+    identity: str | None
+    tags: list[str] | None
+
+    model_config = {"from_attributes": True}
+
+
+class CharacterDetail(BaseModel):
+    id: uuid.UUID
+    world_id: uuid.UUID
+    name: str
+    avatar: str | None
+    identity: str | None
+    personality: str | None
+    background: str | None
+    relationships: str | None
+    language_style: str | None
+    knowledge: str | None
+    greeting: str | None
+    tags: list[str] | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
