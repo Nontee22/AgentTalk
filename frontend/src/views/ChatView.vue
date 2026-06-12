@@ -28,6 +28,13 @@ const conversationId = computed(() => route.params.conversationId as string)
 
 const streamingHtml = computed(() => renderMarkdown(store.streamingContent))
 
+const lastAssistantIndex = computed(() => {
+  for (let i = store.messages.length - 1; i >= 0; i--) {
+    if (store.messages[i].role === 'assistant' && !store.messages[i].error) return i
+  }
+  return -1
+})
+
 function scrollToBottom() {
   nextTick(() => {
     if (messagesContainer.value) {
@@ -130,12 +137,16 @@ function handleNewChat() {
       <div v-if="conversationId" class="flex-1 flex flex-col min-h-0">
         <div ref="messagesContainer" class="flex-1 overflow-y-auto py-4 space-y-1">
           <ChatMessageComp
-            v-for="msg in store.messages"
+            v-for="(msg, index) in store.messages"
             :key="msg.id"
             :message="msg"
             :character-name="character?.name"
             :character-avatar="character?.avatar"
+            :is-last-assistant="msg.role === 'assistant' && !msg.error && index === lastAssistantIndex"
+            :streaming="store.streaming"
             @retry="store.retryLastMessage"
+            @regenerate="store.regenerateLastMessage"
+            @edit="(content: string) => store.editAndResend(msg.id, content)"
           />
 
           <div v-if="store.streaming" class="flex gap-3 px-4 py-2">

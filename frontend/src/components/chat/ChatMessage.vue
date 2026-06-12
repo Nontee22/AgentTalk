@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RotateCcw } from 'lucide-vue-next'
+import { computed, ref, nextTick } from 'vue'
+import { RotateCcw, Pencil, Check, X } from 'lucide-vue-next'
 import type { ChatMessage } from '@/types/chat'
 import { renderMarkdown } from '@/utils/markdown'
 import { formatMessageTime } from '@/utils/formatTime'
@@ -9,18 +9,45 @@ const props = defineProps<{
   message: ChatMessage
   characterName?: string
   characterAvatar?: string | null
+  isLastAssistant?: boolean
+  streaming?: boolean
 }>()
 
 defineEmits<{
   retry: []
+  regenerate: []
+  edit: [content: string]
 }>()
 
 const renderedContent = computed(() => renderMarkdown(props.message.content))
+
+// ─── Edit mode ────────────────────────────────────────────
+const editing = ref(false)
+const editContent = ref('')
+const editTextarea = ref<HTMLTextAreaElement>()
+
+function startEditing() {
+  editContent.value = props.message.content
+  editing.value = true
+  nextTick(() => {
+    const el = editTextarea.value
+    if (el) {
+      el.style.height = 'auto'
+      el.style.height = el.scrollHeight + 'px'
+      el.focus()
+    }
+  })
+}
+
+function cancelEditing() {
+  editing.value = false
+  editContent.value = ''
+}
 </script>
 
 <template>
   <div
-    class="flex gap-3 px-4 py-2"
+    class="group flex gap-3 px-4 py-2"
     :class="message.role === 'user' ? 'flex-row-reverse' : ''"
   >
     <div v-if="message.role === 'assistant'" class="w-8 h-8 rounded-full overflow-hidden bg-bg-hover shrink-0">
@@ -57,7 +84,34 @@ const renderedContent = computed(() => renderMarkdown(props.message.content))
         </button>
       </div>
 
-      <!-- User message (plain text) -->
+      <!-- User message: edit mode -->
+      <div v-else-if="message.role === 'user' && editing" class="w-full">
+        <textarea
+          ref="editTextarea"
+          v-model="editContent"
+          class="w-full rounded-xl px-4 py-2.5 text-sm leading-relaxed bg-bg-surface border border-accent/50 text-text-primary focus:outline-none resize-none"
+          @keydown.enter.exact.prevent="editing = false; $emit('edit', editContent)"
+          @keydown.escape="cancelEditing"
+        />
+        <div class="flex items-center gap-2 mt-1.5 justify-end">
+          <button
+            class="flex items-center gap-1 text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+            @click="cancelEditing"
+          >
+            <X :size="11" />
+            取消
+          </button>
+          <button
+            class="flex items-center gap-1 text-[10px] text-accent hover:text-accent-hover transition-colors"
+            @click="editing = false; $emit('edit', editContent)"
+          >
+            <Check :size="11" />
+            发送
+          </button>
+        </div>
+      </div>
+
+      <!-- User message: display mode -->
       <div
         v-else-if="message.role === 'user'"
         class="rounded-xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap bg-accent/15 text-text-primary"
@@ -72,8 +126,30 @@ const renderedContent = computed(() => renderMarkdown(props.message.content))
         v-html="renderedContent"
       />
 
-      <div class="text-[10px] text-text-muted mt-1" :class="message.role === 'user' ? 'text-right' : ''">
-        {{ formatMessageTime(message.created_at) }}
+      <!-- Timestamp + action buttons row -->
+      <div class="flex items-center gap-2 mt-1" :class="message.role === 'user' ? 'flex-row-reverse' : ''">
+        <span class="text-[10px] text-text-muted">
+          {{ formatMessageTime(message.created_at) }}
+        </span>
+
+        <!-- User message: edit button -->
+        <button
+          v-if="message.role === 'user' && !editing && !streaming"
+          class="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] text-text-muted hover:text-text-secondary transition-all"
+          @click="startEditing"
+        >
+          <Pencil :size="10" />
+        </button>
+
+        <!-- Last assistant message: regenerate button -->
+        <button
+          v-if="isLastAssistant && !streaming"
+          class="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] text-text-muted hover:text-text-secondary transition-all"
+          @click="$emit('regenerate')"
+        >
+          <RotateCcw :size="10" />
+          重新生成
+        </button>
       </div>
     </div>
   </div>

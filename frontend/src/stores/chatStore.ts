@@ -24,6 +24,55 @@ export const useChatStore = defineStore('chat', () => {
   let abortController: AbortController | null = null
   const { showToast } = useToast()
 
+  // ─── Internal: shared streaming logic ───────────────────────
+
+  function _startStream(conversationId: string, content: string) {
+    streaming.value = true
+    streamingContent.value = ''
+
+    abortController = sendMessageSSE(
+      conversationId,
+      content,
+      (token) => {
+        streamingContent.value += token
+      },
+      () => {
+        messages.value.push({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: streamingContent.value,
+          created_at: new Date().toISOString(),
+        })
+        streamingContent.value = ''
+        streaming.value = false
+        fetchConversations()
+        // 记忆提取是后台异步的，延迟刷新一次记忆面板
+        const memoryStore = useMemoryStore()
+        window.setTimeout(() => {
+          if (memoryStore.currentCharacterId) {
+            memoryStore.loadMemories(memoryStore.currentCharacterId)
+          }
+        }, 8000)
+      },
+      (error) => {
+        messages.value.push({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: error,
+          created_at: new Date().toISOString(),
+          error: true,
+        })
+        streamingContent.value = ''
+        streaming.value = false
+      },
+      (attempt) => {
+        showToast(`连接断开，正在重试 (${attempt}/3)...`, 'info')
+      },
+    )
+  }
+
+  // ─── Public methods ─────────────────────────────────────────
+
   async function fetchConversations() {
     conversations.value = await getConversations()
   }
@@ -62,48 +111,46 @@ export const useChatStore = defineStore('chat', () => {
       created_at: new Date().toISOString(),
     })
 
-    streaming.value = true
-    streamingContent.value = ''
+    _startStream(currentConversationId.value, content)
+  }
 
-    abortController = sendMessageSSE(
-      currentConversationId.value,
-      content,
-      (token) => {
-        streamingContent.value += token
-      },
-      () => {
-        messages.value.push({
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: streamingContent.value,
-          created_at: new Date().toISOString(),
-        })
-        streamingContent.value = ''
-        streaming.value = false
-        fetchConversations()
-        // 记忆提取是后台异步的，延迟刷新一次记忆面板
-        const memoryStore = useMemoryStore()
-        window.setTimeout(() => {
-          if (memoryStore.currentCharacterId) {
-            memoryStore.loadMemories(memoryStore.currentCharacterId)
-          }
-        }, 8000)
-      },
-      (error) => {
-        messages.value.push({
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: error,
-          created_at: new Date().toISOString(),
-          error: true,
-        })
-        streamingContent.value = ''
-        streaming.value = false
-      },
-      (attempt) => {
-        showToast(`连接断开，正在重试 (${attempt}/3)...`, 'info')
-      },
-    )
+  function regenerateLastMessage() {
+    if (!currentConversationId.value || streaming.value) return
+
+    // 找最后一条非 error 的 assistant 消息
+    let lastAssistantIdx = -1
+    for (let i = messages.value.length - 1; i >= 0; i--) {
+      if (messages.value[i].role === 'assistant' && !messages.value[i].error) {
+        lastAssistantIdx = i
+        break
+      }
+    }
+    if (lastAssistantIdx === -1) return
+
+    // 找其前面最近的 user 消息
+    const lastUserMsg = messages.value
+      .slice(0, lastAssistantIdx)
+      .reverse()
+      .find((m) => m.role === 'user')
+    if (!lastUserMsg) return
+
+    // 移除 assistant 消息（保留 user 消息）
+    messages.value.splice(lastAssistantIdx, 1)
+
+    _startStream(currentConversationId.value, lastUserMsg.content)
+  }
+
+  function editAndResend(messageId: string, newContent: string) {
+    if (!currentConversationId.value || streaming.value) return
+
+    const idx = messages.value.findIndex((m) => m.id === messageId)
+    if (idx === -1) return
+
+    // 删除该消息及其后所有消息
+    messages.value.splice(idx)
+
+    // 用新内容重新发送
+    sendMessage(newContent)
   }
 
   function retryLastMessage() {
@@ -159,6 +206,8 @@ export const useChatStore = defineStore('chat', () => {
     loadMessages,
     createConversation,
     sendMessage,
+    regenerateLastMessage,
+    editAndResend,
     retryLastMessage,
     stopStreaming,
     removeConversation,
