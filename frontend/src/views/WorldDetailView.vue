@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Pencil, Plus } from 'lucide-vue-next'
 import { useWorldStore } from '@/stores/worldStore'
+import { useAuthStore } from '@/stores/authStore'
+import { useChatStore } from '@/stores/chatStore'
+import { useToast } from '@/composables/useToast'
 import { getCharacter } from '@/api/characters'
 import WorldHero from '@/components/world/WorldHero.vue'
 import WorldLore from '@/components/world/WorldLore.vue'
@@ -14,9 +17,19 @@ import type { Character } from '@/types/world'
 const route = useRoute()
 const router = useRouter()
 const store = useWorldStore()
+const auth = useAuthStore()
+const chatStore = useChatStore()
+const { showToast } = useToast()
 
 const drawerOpen = ref(false)
 const selectedCharacter = ref<Character | null>(null)
+
+const canEdit = computed(() => {
+  const world = store.currentWorld
+  if (!world) return false
+  if (auth.isAdmin) return true
+  return world.created_by === auth.user?.id
+})
 
 onMounted(() => {
   store.fetchWorldDetail(route.params.id as string)
@@ -25,6 +38,16 @@ onMounted(() => {
 async function openDrawer(characterId: string) {
   selectedCharacter.value = await getCharacter(characterId)
   drawerOpen.value = true
+}
+
+async function handleStartChat(characterId: string) {
+  if (!store.currentWorld) return
+  try {
+    const convId = await chatStore.createConversation(characterId, store.currentWorld.id)
+    router.push({ name: 'chat', params: { conversationId: convId } })
+  } catch (err: any) {
+    showToast(err.response?.data?.detail || '创建对话失败', 'error')
+  }
 }
 </script>
 
@@ -42,7 +65,7 @@ async function openDrawer(characterId: string) {
           返回
         </button>
 
-        <div class="flex gap-2">
+        <div class="flex gap-2" v-if="canEdit">
           <router-link
             :to="{ name: 'character-create', params: { worldId: store.currentWorld.id } }"
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] text-text-secondary text-sm hover:bg-white/[0.1] transition-colors"
@@ -80,14 +103,20 @@ async function openDrawer(characterId: string) {
             :key="char.id"
             :character="char"
             @click="openDrawer(char.id)"
+            @start-chat="handleStartChat(char.id)"
           />
         </div>
 
         <EmptyState
-          v-else
+          v-else-if="canEdit"
           message="这个世界还没有角色，添加一个吧"
           action-label="添加角色"
           @action="router.push({ name: 'character-create', params: { worldId: store.currentWorld!.id } })"
+        />
+
+        <EmptyState
+          v-else
+          message="这个世界还没有角色"
         />
       </div>
     </main>

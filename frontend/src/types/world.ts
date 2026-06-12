@@ -9,6 +9,7 @@ export interface WorldBook {
   tags: string[] | null
   cover_image: string | null
   is_preset: boolean
+  created_by: string | null
   character_count: number
   created_at: string
   updated_at: string
@@ -21,6 +22,7 @@ export interface WorldBookSummary {
   tags: string[] | null
   cover_image: string | null
   is_preset: boolean
+  created_by: string | null
   character_count: number
   created_at: string
 }

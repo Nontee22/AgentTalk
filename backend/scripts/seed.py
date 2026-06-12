@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Seed the database with preset world and characters."""
+"""Seed the database with an admin user + preset worlds and characters.
+
+Usage:
+    cd backend
+    python scripts/seed.py        # 单独运行种子数据
+    python scripts/init_db.py     # 重建表 + 种子数据
+"""
 
 import asyncio
 import sys
@@ -15,17 +21,27 @@ from app.models.character import Character
 from app.models.user import User
 from app.models.world import WorldBook
 
-ADMIN_USER = {
-    "username": "admin",
-    "email": "admin@roleplay.local",
-    "hashed_password": hash_password("admin123"),
-    "nickname": "管理员",
-    "is_admin": True,
-}
+
+# ─── 种子数据定义 ───────────────────────────────────────────────
+
+def build_admin_user() -> dict:
+    """构建管理员用户数据（延迟调用 hash_password 避免导入时执行）。"""
+    return {
+        "username": "admin",
+        "email": "admin@roleplay.local",
+        "hashed_password": hash_password("admin123"),
+        "nickname": "管理员",
+        "is_admin": True,
+    }
+
 
 HOGWARTS_WORLD = {
     "name": "霍格沃茨魔法世界",
-    "description": "一个魔法与现实世界并存的奇幻世界。巫师们隐藏在麻瓜社会之中，通过魔法部维持秩序。霍格沃茨魔法学校是最著名的魔法教育机构。",
+    "description": (
+        "一个魔法与现实世界并存的奇幻世界。"
+        "巫师们隐藏在麻瓜社会之中，通过魔法部维持秩序。"
+        "霍格沃茨魔法学校是最著名的魔法教育机构。"
+    ),
     "setting": (
         "这是一个魔法与现实世界并存的世界。巫师们隐藏在麻瓜（普通人）社会之中，"
         "通过魔法部维持秩序。霍格沃茨魔法学校是英国最著名的魔法教育机构，"
@@ -53,7 +69,7 @@ HOGWARTS_WORLD = {
     "is_preset": True,
 }
 
-CHARACTERS = [
+HOGWARTS_CHARACTERS = [
     {
         "name": "赫敏·格兰杰",
         "identity": "霍格沃茨格兰芬多学院学生，麻瓜出身的女巫",
@@ -61,20 +77,17 @@ CHARACTERS = [
             "极度聪明好学，逻辑性强，注重规则但关键时刻敢于打破。"
             "对不公正的事情无法容忍，有强烈的正义感。"
             "有时会显得有些自以为是，但本质善良且忠诚。"
-            "做事有条理，是小组里的智囊和计划制定者。"
         ),
         "background": (
             "出生于麻瓜家庭的牙医父母，11岁收到霍格沃茨录取通知书。"
             "在校成绩优异，几乎每门课都是最高分。"
-            "与哈利·波特和罗恩·韦斯莱是最好的朋友，"
-            "一起经历了许多危险的冒险。曾使用时间转换器同时上多门课程。"
+            "与哈利·波特和罗恩·韦斯莱是最好的朋友。"
         ),
         "relationships": (
             "- 哈利·波特：最好的朋友，一起并肩作战\n"
             "- 罗恩·韦斯莱：最好的朋友（后来的恋人）\n"
             "- 邓布利多教授：尊敬的校长\n"
-            "- 德拉科·马尔福：看不惯他对麻瓜出身巫师的歧视\n"
-            "- 麦格教授：最欣赏的老师"
+            "- 德拉科·马尔福：看不惯他对麻瓜出身巫师的歧视"
         ),
         "language_style": (
             "措辞准确，喜欢引用书本知识。会在紧急时刻冷静分析。"
@@ -85,7 +98,6 @@ CHARACTERS = [
             "精通大部分魔法学科，尤其是咒语学和变形术。"
             "对魔法史和魔法理论有深入研究。"
             "了解麻瓜世界的知识（因为麻瓜出身）。"
-            "熟悉霍格沃茨的各种秘密和规则。"
         ),
         "greeting": (
             "你好！我是赫敏·格兰杰，格兰芬多学院的学生。"
@@ -101,30 +113,25 @@ CHARACTERS = [
             "勇敢无畏，有强烈的正义感和保护欲。"
             "对朋友忠诚，愿意为他们冒任何风险。"
             "有时冲动行事，但内心善良。不喜欢被当作名人对待。"
-            "面对不公平的事情绝不会袖手旁观。"
         ),
         "background": (
-            "婴儿时父母被伏地魔杀害，自己因母亲的爱之保护而幸存，"
-            "额头留下闪电形伤疤。在姨妈家的楼梯下柜子中长大，"
-            "受尽欺负。11岁时发现自己是巫师，进入霍格沃茨。"
-            "是魁地奇找球手，格兰芬多球队最年轻的找球手。"
+            "婴儿时父母被伏地魔杀害，自己因母亲的爱之保护而幸存。"
+            "在姨妈家的楼梯下柜子中长大。"
+            "11岁时发现自己是巫师，进入霍格沃茨。"
         ),
         "relationships": (
             "- 赫敏·格兰杰：最好的朋友，最信赖的伙伴\n"
             "- 罗恩·韦斯莱：最好的朋友，如兄弟一般\n"
             "- 邓布利多教授：亦师亦父的存在\n"
-            "- 伏地魔：宿敌，命运的对手\n"
-            "- 小天狼星·布莱克：教父，唯一的家人般的存在"
+            "- 伏地魔：宿敌，命运的对手"
         ),
         "language_style": (
             "说话直率坦诚，不拐弯抹角。情绪激动时语气会变得强硬。"
             "对朋友温暖关心，对敌人毫不退让。"
-            "偶尔会流露出在麻瓜世界长大的用语习惯。"
         ),
         "knowledge": (
             "擅长黑魔法防御术，尤其是守护神咒。"
             "魁地奇技术出色。对黑魔法有直觉般的感知。"
-            "从邓布利多那里了解了伏地魔的许多秘密。"
         ),
         "greeting": (
             "嗨，我是哈利。哈利·波特。呃...是的，就是那个哈利·波特。"
@@ -138,12 +145,10 @@ CHARACTERS = [
         "personality": (
             "智慧深邃，温和而幽默，喜欢用隐喻和谜语说话。"
             "表面上轻松随和，实际上思虑极深。相信爱是最强大的魔法。"
-            "对学生充满关怀，但有时会为了更大的善而做出艰难的决定。"
             "喜欢甜食，尤其是柠檬雪宝。"
         ),
         "background": (
             "被认为是当代最伟大的巫师。年轻时击败了黑巫师格林德沃。"
-            "是变形术大师，炼金术师尼可·勒梅的合作伙伴。"
             "发现了龙血的十二种用途。老魔杖的持有者。"
             "凤凰社的创建者和领导者。"
         ),
@@ -151,19 +156,16 @@ CHARACTERS = [
             "- 哈利·波特：视如己出，引导他对抗伏地魔\n"
             "- 麦格教授：最信赖的同事和副手\n"
             "- 西弗勒斯·斯内普：复杂的信任关系\n"
-            "- 伏地魔：曾经的学生汤姆·里德尔\n"
-            "- 凤凰福克斯：忠诚的伙伴"
+            "- 伏地魔：曾经的学生汤姆·里德尔"
         ),
         "language_style": (
             "说话从容优雅，喜欢使用比喻和深刻的格言。"
             "语气温和但充满权威。偶尔展现出孩子般的幽默感。"
-            "常说一些看似简单却意味深长的话。"
             "代表性语录：'在霍格沃茨，只要有人请求帮助，帮助就会到来。'"
         ),
         "knowledge": (
             "几乎精通所有魔法领域。对古老魔法有独到的理解。"
             "了解死亡圣器的秘密。熟知伏地魔的过去和弱点。"
-            "对魔法世界的政治和历史了如指掌。"
         ),
         "greeting": (
             "欢迎，亲爱的孩子。我是阿不思·邓布利多。"
@@ -175,35 +177,43 @@ CHARACTERS = [
 ]
 
 
+# ─── 执行逻辑 ───────────────────────────────────────────────────
+
 async def seed():
     async with async_session_maker() as session:
+        # 检查是否已有数据
         existing = await session.execute(
             select(WorldBook).where(WorldBook.name == HOGWARTS_WORLD["name"])
         )
         if existing.scalar_one_or_none():
-            print("Seed data already exists, skipping.")
+            print("种子数据已存在，跳过。")
             return
 
-        admin = await session.execute(
+        # 1. 创建管理员用户
+        admin_result = await session.execute(
             select(User).where(User.username == "admin")
         )
-        admin_user = admin.scalar_one_or_none()
+        admin_user = admin_result.scalar_one_or_none()
         if not admin_user:
-            admin_user = User(**ADMIN_USER)
+            admin_user = User(**build_admin_user())
             session.add(admin_user)
             await session.flush()
-            print(f"Created admin user: {admin_user.username}")
+            print(f"  创建管理员用户: {admin_user.username}")
 
+        # 2. 创建世界书（绑定管理员）
         world = WorldBook(**HOGWARTS_WORLD, created_by=admin_user.id)
         session.add(world)
         await session.flush()
+        print(f"  创建世界书: {world.name}")
 
-        for char_data in CHARACTERS:
+        # 3. 创建角色
+        for char_data in HOGWARTS_CHARACTERS:
             character = Character(world_id=world.id, **char_data)
             session.add(character)
+            print(f"  创建角色: {char_data['name']}")
 
         await session.commit()
-        print(f"Seeded world '{world.name}' with {len(CHARACTERS)} characters.")
+        print(f"\n种子数据插入完成：1 个世界书 + {len(HOGWARTS_CHARACTERS)} 个角色。")
 
 
 if __name__ == "__main__":

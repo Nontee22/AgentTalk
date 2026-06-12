@@ -13,21 +13,18 @@ const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const loading = ref(false)
-const errorMsg = ref('')
 
 async function handleRegister() {
-  errorMsg.value = ''
-
-  if (!username.value || !email.value || !password.value) {
-    errorMsg.value = '请填写所有字段'
+  if (!username.value || !email.value || !password.value || !confirmPassword.value) {
+    showToast('请填写所有字段', 'error')
     return
   }
   if (password.value.length < 6) {
-    errorMsg.value = '密码长度至少 6 位'
+    showToast('密码长度至少 6 位', 'error')
     return
   }
   if (password.value !== confirmPassword.value) {
-    errorMsg.value = '两次输入的密码不一致'
+    showToast('两次输入的密码不一致', 'error')
     return
   }
 
@@ -41,7 +38,7 @@ async function handleRegister() {
     showToast('注册成功', 'success')
     router.push('/worlds')
   } catch (err: any) {
-    errorMsg.value = err.response?.data?.detail || '注册失败，请稍后重试'
+    showToast(err.response?.data?.detail || '注册失败，请稍后重试', 'error')
   } finally {
     loading.value = false
   }
@@ -104,8 +101,6 @@ async function handleRegister() {
             placeholder="再次输入密码"
           />
         </div>
-
-        <div v-if="errorMsg" class="text-danger text-sm">{{ errorMsg }}</div>
 
         <button
           type="submit"

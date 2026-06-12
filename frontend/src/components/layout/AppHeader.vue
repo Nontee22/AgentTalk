@@ -47,6 +47,7 @@ function handleLogout() {
 
       <div class="flex items-center gap-3 shrink-0">
         <router-link
+          v-if="auth.isAdmin"
           to="/worlds/create"
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-bg-deep text-sm font-medium hover:bg-accent-hover transition-colors"
         >
@@ -58,7 +59,7 @@ function handleLogout() {
           <button
             class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bg-hover transition-colors"
             @click="showDropdown = !showDropdown"
-            @blur="setTimeout(() => (showDropdown = false), 150)"
+            @blur="window.setTimeout(() => (showDropdown = false), 150)"
           >
             <div class="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center">
               <User :size="14" class="text-accent" />

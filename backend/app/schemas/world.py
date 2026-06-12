@@ -35,6 +35,7 @@ class WorldBookSummary(BaseModel):
     tags: list[str] | None
     cover_image: str | None
     is_preset: bool
+    created_by: uuid.UUID | None = None
     character_count: int = 0
     created_at: datetime
 
@@ -52,6 +53,7 @@ class WorldBookDetail(BaseModel):
     tags: list[str] | None
     cover_image: str | None
     is_preset: bool
+    created_by: uuid.UUID | None = None
     character_count: int = 0
     created_at: datetime
     updated_at: datetime

@@ -14,9 +14,9 @@ const { toasts, removeToast } = useToast()
           :key="toast.id"
           class="flex items-start gap-3 rounded-lg px-4 py-3 shadow-lg border backdrop-blur-sm"
           :class="{
-            'bg-bg-surface/95 border-white/[0.08] text-text-primary': toast.type === 'info',
-            'bg-red-950/90 border-red-800/40 text-red-200': toast.type === 'error',
-            'bg-green-950/90 border-green-800/40 text-green-200': toast.type === 'success',
+            'bg-bg-surface/95 border-white/[0.08] text-white': toast.type === 'info',
+            'bg-bg-surface/95 border-white/[0.08] text-white': toast.type === 'error',
+            'bg-green-950/90 border-green-800/40 text-white': toast.type === 'success',
           }"
         >
           <Info v-if="toast.type === 'info'" :size="16" class="mt-0.5 shrink-0 text-accent" />

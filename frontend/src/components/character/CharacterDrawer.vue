@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Character } from '@/types/world'
 import { X, MessageCircle } from 'lucide-vue-next'
 import { useChatStore } from '@/stores/chatStore'
+import { useToast } from '@/composables/useToast'
 import FoldableSection from '@/components/common/FoldableSection.vue'
 import TagBadge from '@/components/common/TagBadge.vue'
 
@@ -17,13 +19,23 @@ defineEmits<{
 
 const router = useRouter()
 const chatStore = useChatStore()
+const { showToast } = useToast()
+const starting = ref(false)
 
 async function startChat() {
-  const convId = await chatStore.createConversation(
-    props.character.id,
-    props.character.world_id,
-  )
-  router.push({ name: 'chat', params: { conversationId: convId } })
+  if (starting.value) return
+  starting.value = true
+  try {
+    const convId = await chatStore.createConversation(
+      props.character.id,
+      props.character.world_id,
+    )
+    router.push({ name: 'chat', params: { conversationId: convId } })
+  } catch (err: any) {
+    showToast(err.response?.data?.detail || '创建对话失败', 'error')
+  } finally {
+    starting.value = false
+  }
 }
 </script>
 
@@ -33,8 +45,8 @@ async function startChat() {
       <div v-if="open" class="fixed inset-0 z-50 flex justify-end">
         <div class="absolute inset-0 bg-black/50" @click="$emit('close')" />
 
-        <div class="relative w-[400px] max-w-full bg-bg-surface border-l border-white/[0.08] overflow-y-auto flex flex-col">
-          <div class="sticky top-0 z-10 flex items-center justify-end p-4 bg-bg-surface/80 backdrop-blur-sm">
+        <div class="relative w-[400px] max-w-full bg-bg-surface border-l border-white/[0.08] flex flex-col">
+          <div class="flex items-center justify-end p-4 shrink-0">
             <button
               class="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-muted hover:text-text-primary transition-colors"
               @click="$emit('close')"
@@ -43,7 +55,7 @@ async function startChat() {
             </button>
           </div>
 
-          <div class="flex-1 px-6 pb-6">
+          <div class="flex-1 overflow-y-auto px-6 pb-6">
             <div class="flex flex-col items-center text-center mb-6">
               <div class="w-24 h-24 rounded-full overflow-hidden bg-bg-hover mb-4 border-2 border-white/[0.08]">
                 <img
@@ -94,13 +106,14 @@ async function startChat() {
             </div>
           </div>
 
-          <div class="sticky bottom-0 p-4 border-t border-white/[0.06] bg-bg-surface">
+          <div class="shrink-0 p-4 border-t border-white/[0.06] bg-bg-surface">
             <button
-              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent text-bg-deep font-medium hover:bg-accent-hover transition-colors"
+              :disabled="starting"
+              class="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent text-bg-deep font-medium hover:bg-accent-hover transition-colors disabled:opacity-50"
               @click="startChat"
             >
               <MessageCircle :size="16" />
-              开始对话
+              {{ starting ? '创建中...' : '开始对话' }}
             </button>
           </div>
         </div>

@@ -56,6 +56,8 @@ async def create_world(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="仅管理员可创建世界书")
     world = await world_service.create_world(db, data, user_id=current_user.id)
     detail = await world_service.get_world(db, world.id)
     return WorldBookDetail(**detail)
@@ -71,7 +73,9 @@ async def update_world(
     existing = await db.get(world_service.WorldBook, world_id)
     if not existing:
         raise HTTPException(status_code=404, detail="World not found")
-    if existing.created_by != current_user.id and not current_user.is_admin:
+    if existing.is_preset and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="预设世界书仅管理员可编辑")
+    if not existing.is_preset and existing.created_by != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="无权编辑此世界书")
 
     world = await world_service.update_world(db, world_id, data)
@@ -88,7 +92,9 @@ async def delete_world(
     existing = await db.get(world_service.WorldBook, world_id)
     if not existing:
         raise HTTPException(status_code=404, detail="World not found")
-    if existing.created_by != current_user.id and not current_user.is_admin:
+    if existing.is_preset and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="预设世界书仅管理员可删除")
+    if not existing.is_preset and existing.created_by != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="无权删除此世界书")
 
     await world_service.delete_world(db, world_id)

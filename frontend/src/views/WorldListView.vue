@@ -2,6 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWorldStore } from '@/stores/worldStore'
+import { useAuthStore } from '@/stores/authStore'
 import WorldCard from '@/components/world/WorldCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { useRouter } from 'vue-router'
@@ -9,6 +10,7 @@ import { useRouter } from 'vue-router'
 const route = useRoute()
 const router = useRouter()
 const store = useWorldStore()
+const auth = useAuthStore()
 
 const selectedTag = ref<string | null>(null)
 const searchQuery = ref((route.query.search as string) || '')
@@ -95,10 +97,15 @@ onMounted(loadWorlds)
     </div>
 
     <EmptyState
-      v-else
+      v-else-if="auth.isAdmin"
       message="还没有世界书，创建你的第一个世界"
       action-label="创建世界"
       @action="router.push({ name: 'world-create' })"
+    />
+
+    <EmptyState
+      v-else
+      message="还没有世界书"
     />
   </main>
 </template>

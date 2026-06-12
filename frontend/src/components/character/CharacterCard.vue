@@ -9,6 +9,7 @@ defineProps<{
 
 defineEmits<{
   click: []
+  startChat: []
 }>()
 </script>
 
@@ -43,7 +44,7 @@ defineEmits<{
 
       <button
         class="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-accent/10 text-accent text-sm hover:bg-accent/20 transition-colors"
-        @click.stop
+        @click.stop="$emit('startChat')"
       >
         <MessageCircle :size="14" />
         开始对话

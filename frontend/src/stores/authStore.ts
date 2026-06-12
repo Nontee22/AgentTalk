@@ -41,7 +41,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function logout() {
     clearTokens()
-    showToast('已退出登录', 'info')
+    showToast('已退出登录', 'success')
   }
 
   async function fetchProfile() {

@@ -60,6 +60,7 @@ function handleKeydown(e: KeyboardEvent) {
         @keydown="handleKeydown"
       />
       <button
+        type="button"
         class="px-3 py-2 rounded-lg bg-white/[0.06] text-text-secondary text-sm hover:bg-white/[0.1] transition-colors"
         @click="addTag"
       >

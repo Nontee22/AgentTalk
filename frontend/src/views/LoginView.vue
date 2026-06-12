@@ -12,12 +12,10 @@ const { showToast } = useToast()
 const username = ref('')
 const password = ref('')
 const loading = ref(false)
-const errorMsg = ref('')
 
 async function handleLogin() {
-  errorMsg.value = ''
   if (!username.value || !password.value) {
-    errorMsg.value = '请填写用户名和密码'
+    showToast('请填写用户名和密码', 'error')
     return
   }
 
@@ -28,7 +26,7 @@ async function handleLogin() {
     const redirect = (route.query.redirect as string) || '/worlds'
     router.push(redirect)
   } catch (err: any) {
-    errorMsg.value = err.response?.data?.detail || '登录失败，请检查用户名和密码'
+    showToast(err.response?.data?.detail || '登录失败，请检查用户名和密码', 'error')
   } finally {
     loading.value = false
   }
@@ -69,8 +67,6 @@ async function handleLogin() {
             placeholder="请输入密码"
           />
         </div>
-
-        <div v-if="errorMsg" class="text-danger text-sm">{{ errorMsg }}</div>
 
         <button
           type="submit"
