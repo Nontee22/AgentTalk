@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     memory_token_budget: int = 1500
     memory_decay_halflife_days: float = 30.0
     memory_extraction_min_messages: int = 4
+    memory_extraction_context_messages: int = 10
 
     cors_origins: str = "http://localhost:5173"
 

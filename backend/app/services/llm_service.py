@@ -48,13 +48,21 @@ async def chat_stream(
         raise LLMStreamError("模型生成中断", model=model) from e
 
 
-async def generate_completion(prompt: str, max_tokens: int = 1024) -> str:
+async def generate_completion(
+    prompt: str,
+    max_tokens: int = 1024,
+    system_prompt: str | None = None,
+) -> str:
     """Non-streaming completion for internal use (memory extraction, etc.)."""
     model = settings.llm_model
+    messages: list[dict[str, str]] = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
     try:
         response = await client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             max_tokens=max_tokens,
             temperature=0.3,
         )

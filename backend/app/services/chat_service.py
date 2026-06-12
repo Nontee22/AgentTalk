@@ -270,7 +270,7 @@ async def _maybe_extract_memories(
                 select(Message)
                 .where(Message.conversation_id == conversation_id)
                 .order_by(Message.created_at.desc())
-                .limit(settings.memory_extraction_min_messages)
+                .limit(settings.memory_extraction_context_messages)
             )
             messages = [
                 {"role": m.role, "content": m.content}
@@ -292,6 +292,8 @@ async def _maybe_extract_memories(
                 character_name=character.name,
                 username=user.nickname or user.username,
                 messages=messages,
+                character_identity=character.identity or "",
+                character_personality=character.personality or "",
             )
 
             conversation.last_memory_extraction_at_count = conversation.message_count

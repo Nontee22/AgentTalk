@@ -253,16 +253,12 @@ INDEX_STATEMENTS = [
 ]
 
 
-def create_indexes():
-    """创建性能索引（同步执行）。"""
-    from sqlalchemy import create_engine
-
-    sync_engine = create_engine(settings.database_url_sync)
-    with sync_engine.begin() as conn:
+async def create_indexes():
+    """创建性能索引（异步执行，复用 asyncpg 引擎）。"""
+    async with engine.begin() as conn:
         for sql in INDEX_STATEMENTS:
             print(f"  ✓ {sql.split('IF NOT EXISTS ')[1].split(' ON')[0]}")
-            conn.execute(text(sql))
-    sync_engine.dispose()
+            await conn.execute(text(sql))
     print("  索引创建完成")
 
 
@@ -278,7 +274,7 @@ async def run_all():
     await seed()
 
     print("\n[3/3] 创建性能索引...")
-    create_indexes()
+    await create_indexes()
 
     print("\n数据库初始化完成！")
     print("  管理员账号: admin")
@@ -295,7 +291,7 @@ def main():
         asyncio.run(seed())
     elif cmd == "indexes":
         print("\n创建性能索引...")
-        create_indexes()
+        asyncio.run(create_indexes())
     else:
         print(f"未知命令: {cmd}")
         print("用法: python scripts/init_db.py [all|seed|indexes]")
