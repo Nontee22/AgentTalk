@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     redis_port: int = 6379
 
     jwt_secret: str = "dev-secret-change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
 
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com"

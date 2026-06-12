@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.api.auth import router as auth_router
 from app.api.characters import router as characters_router
 from app.api.chat import router as chat_router
 from app.api.health import router as health_router
@@ -41,7 +42,12 @@ app.add_middleware(
 app.mount("/api/static", StaticFiles(directory=str(UPLOAD_DIR)), name="static")
 
 app.include_router(health_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
 app.include_router(worlds_router, prefix="/api")
 app.include_router(characters_router, prefix="/api")
 app.include_router(upload_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

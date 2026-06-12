@@ -83,8 +83,10 @@ async def get_world(db: AsyncSession, world_id: uuid.UUID) -> dict | None:
     }
 
 
-async def create_world(db: AsyncSession, data: WorldBookCreate) -> WorldBook:
-    world = WorldBook(**data.model_dump())
+async def create_world(
+    db: AsyncSession, data: WorldBookCreate, *, user_id: uuid.UUID | None = None
+) -> WorldBook:
+    world = WorldBook(**data.model_dump(), created_by=user_id)
     db.add(world)
     await db.commit()
     await db.refresh(world)

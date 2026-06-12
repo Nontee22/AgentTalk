@@ -51,11 +51,22 @@ export function sendMessageSSE(
   function attempt(retryCount: number) {
     fetch(`/api/chat/${conversationId}/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('access_token')
+          ? { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+          : {}),
+      },
       body: JSON.stringify({ content }),
       signal: controller.signal,
     })
       .then(async (response) => {
+        if (response.status === 401) {
+          localStorage.removeItem('access_token')
+          localStorage.removeItem('refresh_token')
+          window.location.href = '/login'
+          return
+        }
         if (!response.ok || !response.body) {
           onError('连接失败')
           return

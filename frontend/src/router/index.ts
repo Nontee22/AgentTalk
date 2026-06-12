@@ -8,6 +8,18 @@ const router = createRouter({
       redirect: '/worlds',
     },
     {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/LoginView.vue'),
+      meta: { guest: true },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/RegisterView.vue'),
+      meta: { guest: true },
+    },
+    {
       path: '/worlds',
       name: 'worlds',
       component: () => import('@/views/WorldListView.vue'),
@@ -43,6 +55,19 @@ const router = createRouter({
       component: () => import('@/views/ChatView.vue'),
     },
   ],
+})
+
+router.beforeEach((to) => {
+  const token = localStorage.getItem('access_token')
+  const isAuthenticated = !!token
+
+  if (!to.meta.guest && !isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.meta.guest && isAuthenticated) {
+    return { name: 'worlds' }
+  }
 })
 
 export default router

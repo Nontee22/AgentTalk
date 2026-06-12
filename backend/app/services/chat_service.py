@@ -10,7 +10,7 @@ from app.models.character import Character
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.world import WorldBook
-from app.services.llm_service import chat_stream
+from app.services.llm_service import chat_stream, generate_title
 from app.services.prompt_builder import build_messages, build_system_prompt
 from app.services.stream_registry import (
     is_cancelled,
@@ -26,6 +26,8 @@ async def start_conversation(
     db: AsyncSession,
     character_id: uuid.UUID,
     world_id: uuid.UUID,
+    *,
+    user_id: uuid.UUID | None = None,
 ) -> tuple[Conversation, Message | None]:
     character = await db.get(Character, character_id)
     if not character:
@@ -34,6 +36,7 @@ async def start_conversation(
     conversation = Conversation(
         character_id=character_id,
         world_id=world_id,
+        user_id=user_id,
         title=f"与{character.name}的对话",
     )
     db.add(conversation)
@@ -116,8 +119,16 @@ async def send_message_stream(
         conversation.message_count += 1
         await db.commit()
 
+        if conversation.message_count <= 3:
+            title = await generate_title(user_content, full_response)
+            if title:
+                conversation.title = title
+                await db.commit()
 
-async def get_conversations(db: AsyncSession) -> list[dict]:
+
+async def get_conversations(
+    db: AsyncSession, *, user_id: uuid.UUID | None = None
+) -> list[dict]:
     last_msg_subq = (
         select(Message.content)
         .where(Message.conversation_id == Conversation.id)
@@ -127,11 +138,14 @@ async def get_conversations(db: AsyncSession) -> list[dict]:
         .scalar_subquery()
     )
 
-    result = await db.execute(
-        select(Conversation, last_msg_subq.label("last_message_content"))
-        .options(joinedload(Conversation.character))
-        .order_by(Conversation.updated_at.desc())
+    query = select(Conversation, last_msg_subq.label("last_message_content")).options(
+        joinedload(Conversation.character)
     )
+    if user_id is not None:
+        query = query.where(Conversation.user_id == user_id)
+    query = query.order_by(Conversation.updated_at.desc())
+
+    result = await db.execute(query)
     rows = result.unique().all()
 
     items = []

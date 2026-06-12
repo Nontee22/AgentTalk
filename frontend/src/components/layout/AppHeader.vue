@@ -1,14 +1,27 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Plus } from 'lucide-vue-next'
+import { Search, Plus, LogOut, User, ChevronDown } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/authStore'
 
 const router = useRouter()
+const auth = useAuthStore()
 const searchQuery = ref('')
+const showDropdown = ref(false)
+
+const displayName = computed(
+  () => auth.user?.nickname || auth.user?.username || '用户',
+)
 
 function handleSearch() {
   const q = searchQuery.value.trim()
   router.push({ name: 'worlds', query: q ? { search: q } : {} })
+}
+
+function handleLogout() {
+  showDropdown.value = false
+  auth.logout()
+  router.push('/login')
 }
 </script>
 
@@ -32,13 +45,42 @@ function handleSearch() {
         </form>
       </div>
 
-      <router-link
-        to="/worlds/create"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-bg-deep text-sm font-medium hover:bg-accent-hover transition-colors shrink-0"
-      >
-        <Plus :size="16" />
-        创建世界
-      </router-link>
+      <div class="flex items-center gap-3 shrink-0">
+        <router-link
+          to="/worlds/create"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-bg-deep text-sm font-medium hover:bg-accent-hover transition-colors"
+        >
+          <Plus :size="16" />
+          创建世界
+        </router-link>
+
+        <div class="relative">
+          <button
+            class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bg-hover transition-colors"
+            @click="showDropdown = !showDropdown"
+            @blur="setTimeout(() => (showDropdown = false), 150)"
+          >
+            <div class="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center">
+              <User :size="14" class="text-accent" />
+            </div>
+            <span class="text-text-primary text-sm max-w-[80px] truncate">{{ displayName }}</span>
+            <ChevronDown :size="14" class="text-text-muted" />
+          </button>
+
+          <div
+            v-if="showDropdown"
+            class="absolute right-0 top-full mt-1 w-40 bg-bg-surface border border-white/[0.08] rounded-lg shadow-lg py-1 z-50"
+          >
+            <button
+              class="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-hover transition-colors flex items-center gap-2"
+              @mousedown="handleLogout"
+            >
+              <LogOut :size="14" class="text-text-secondary" />
+              退出登录
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 </template>

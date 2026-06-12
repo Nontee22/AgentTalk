@@ -1,9 +1,11 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 
 from app.core.config import PROJECT_ROOT
+from app.core.deps import get_current_user
+from app.models.user import User
 
 router = APIRouter(tags=["upload"])
 
@@ -16,6 +18,7 @@ MAX_FILE_SIZE = 5 * 1024 * 1024
 async def upload_file(
     file: UploadFile,
     category: str = Query("covers", pattern="^(covers|avatars)$"),
+    current_user: User = Depends(get_current_user),
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")

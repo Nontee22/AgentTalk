@@ -4,6 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.deps import get_current_user
+from app.models.user import User
+from app.models.world import WorldBook
 from app.schemas.character import (
     CharacterCreate,
     CharacterDetail,
@@ -21,6 +24,7 @@ router = APIRouter(tags=["characters"])
 )
 async def list_characters(
     world_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     characters = await character_service.get_characters(db, world_id)
@@ -30,6 +34,7 @@ async def list_characters(
 @router.get("/characters/{character_id}", response_model=CharacterDetail)
 async def get_character(
     character_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     character = await character_service.get_character(db, character_id)
@@ -46,11 +51,16 @@ async def get_character(
 async def create_character(
     world_id: uuid.UUID,
     data: CharacterCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    character = await character_service.create_character(db, world_id, data)
-    if not character:
+    world = await db.get(WorldBook, world_id)
+    if not world:
         raise HTTPException(status_code=404, detail="World not found")
+    if world.created_by != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="无权在此世界书下创建角色")
+
+    character = await character_service.create_character(db, world_id, data)
     return CharacterDetail.model_validate(character)
 
 
@@ -58,19 +68,33 @@ async def create_character(
 async def update_character(
     character_id: uuid.UUID,
     data: CharacterUpdate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    character = await character_service.update_character(db, character_id, data)
+    character = await character_service.get_character(db, character_id)
     if not character:
         raise HTTPException(status_code=404, detail="Character not found")
+
+    world = await db.get(WorldBook, character.world_id)
+    if world and world.created_by != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="无权编辑此角色")
+
+    character = await character_service.update_character(db, character_id, data)
     return CharacterDetail.model_validate(character)
 
 
 @router.delete("/characters/{character_id}", status_code=204)
 async def delete_character(
     character_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    deleted = await character_service.delete_character(db, character_id)
-    if not deleted:
+    character = await character_service.get_character(db, character_id)
+    if not character:
         raise HTTPException(status_code=404, detail="Character not found")
+
+    world = await db.get(WorldBook, character.world_id)
+    if world and world.created_by != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="无权删除此角色")
+
+    await character_service.delete_character(db, character_id)

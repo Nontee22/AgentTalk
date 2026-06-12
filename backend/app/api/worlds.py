@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.deps import get_current_user
+from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.world import (
     WorldBookCreate,
@@ -22,6 +24,7 @@ async def list_worlds(
     page_size: int = Query(12, ge=1, le=50),
     tag: str | None = None,
     search: str | None = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     items, total = await world_service.get_worlds(
@@ -38,6 +41,7 @@ async def list_worlds(
 @router.get("/{world_id}", response_model=WorldBookDetail)
 async def get_world(
     world_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     world = await world_service.get_world(db, world_id)
@@ -49,9 +53,10 @@ async def get_world(
 @router.post("", response_model=WorldBookDetail, status_code=201)
 async def create_world(
     data: WorldBookCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    world = await world_service.create_world(db, data)
+    world = await world_service.create_world(db, data, user_id=current_user.id)
     detail = await world_service.get_world(db, world.id)
     return WorldBookDetail(**detail)
 
@@ -60,11 +65,16 @@ async def create_world(
 async def update_world(
     world_id: uuid.UUID,
     data: WorldBookUpdate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    world = await world_service.update_world(db, world_id, data)
-    if not world:
+    existing = await db.get(world_service.WorldBook, world_id)
+    if not existing:
         raise HTTPException(status_code=404, detail="World not found")
+    if existing.created_by != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="无权编辑此世界书")
+
+    world = await world_service.update_world(db, world_id, data)
     detail = await world_service.get_world(db, world.id)
     return WorldBookDetail(**detail)
 
@@ -72,8 +82,13 @@ async def update_world(
 @router.delete("/{world_id}", status_code=204)
 async def delete_world(
     world_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    deleted = await world_service.delete_world(db, world_id)
-    if not deleted:
+    existing = await db.get(world_service.WorldBook, world_id)
+    if not existing:
         raise HTTPException(status_code=404, detail="World not found")
+    if existing.created_by != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="无权删除此世界书")
+
+    await world_service.delete_world(db, world_id)

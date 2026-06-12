@@ -7,7 +7,10 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.deps import get_current_user
 from app.core.exceptions import LLMError
+from app.models.conversation import Conversation
+from app.models.user import User
 from app.schemas.chat import (
     ChatStartResponse,
     ConversationCreate,
@@ -23,14 +26,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
+async def _check_conversation_owner(
+    db: AsyncSession, conversation_id: uuid.UUID, user_id: uuid.UUID
+) -> Conversation:
+    conversation = await db.get(Conversation, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if conversation.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权访问此会话")
+    return conversation
+
+
 @router.post("/start", response_model=ChatStartResponse, status_code=201)
 async def start_chat(
     data: ConversationCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     try:
         conversation, greeting = await chat_service.start_conversation(
-            db, data.character_id, data.world_id
+            db, data.character_id, data.world_id, user_id=current_user.id
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -45,8 +60,11 @@ async def start_chat(
 async def send_message(
     conversation_id: uuid.UUID,
     data: MessageCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await _check_conversation_owner(db, conversation_id, current_user.id)
+
     async def event_stream():
         try:
             async for token in chat_service.send_message_stream(
@@ -78,7 +96,11 @@ async def send_message(
 @router.post("/{conversation_id}/stop")
 async def stop_generation(
     conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
+    await _check_conversation_owner(db, conversation_id, current_user.id)
+
     from app.services.stream_registry import cancel_stream
 
     cancelled = cancel_stream(conversation_id)
@@ -89,9 +111,10 @@ async def stop_generation(
 
 @router.get("/conversations", response_model=list[ConversationSummary])
 async def list_conversations(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    items = await chat_service.get_conversations(db)
+    items = await chat_service.get_conversations(db, user_id=current_user.id)
     return [ConversationSummary(**item) for item in items]
 
 
@@ -100,8 +123,11 @@ async def get_conversation_messages(
     conversation_id: uuid.UUID,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await _check_conversation_owner(db, conversation_id, current_user.id)
+
     messages, total = await chat_service.get_messages(
         db, conversation_id, page, page_size
     )
@@ -116,8 +142,11 @@ async def get_conversation_messages(
 @router.delete("/{conversation_id}", status_code=204)
 async def delete_conversation(
     conversation_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await _check_conversation_owner(db, conversation_id, current_user.id)
+
     deleted = await chat_service.delete_conversation(db, conversation_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")

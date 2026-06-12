@@ -46,3 +46,27 @@ async def chat_stream(
     except Exception as e:
         logger.error("LLM stream interrupted: model=%s, %s", model, e)
         raise LLMStreamError("模型生成中断", model=model) from e
+
+
+async def generate_title(user_msg: str, assistant_msg: str) -> str:
+    model = settings.llm_model
+    try:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "根据以下对话生成一个简短的中文标题（不超过15个字），只输出标题文本，不要加引号或其他标点。",
+                },
+                {"role": "user", "content": user_msg},
+                {"role": "assistant", "content": assistant_msg[:200]},
+                {"role": "user", "content": "请为这段对话生成一个简短标题。"},
+            ],
+            max_tokens=30,
+            temperature=0.3,
+        )
+        title = response.choices[0].message.content.strip().strip("\"'""''《》")
+        return title[:50] if title else "新对话"
+    except Exception as e:
+        logger.warning("Title generation failed: %s", e)
+        return ""

@@ -10,8 +10,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import select
 
 from app.core.database import async_session_maker
+from app.core.security import hash_password
 from app.models.character import Character
+from app.models.user import User
 from app.models.world import WorldBook
+
+ADMIN_USER = {
+    "username": "admin",
+    "email": "admin@roleplay.local",
+    "hashed_password": hash_password("admin123"),
+    "nickname": "管理员",
+    "is_admin": True,
+}
 
 HOGWARTS_WORLD = {
     "name": "霍格沃茨魔法世界",
@@ -174,7 +184,17 @@ async def seed():
             print("Seed data already exists, skipping.")
             return
 
-        world = WorldBook(**HOGWARTS_WORLD)
+        admin = await session.execute(
+            select(User).where(User.username == "admin")
+        )
+        admin_user = admin.scalar_one_or_none()
+        if not admin_user:
+            admin_user = User(**ADMIN_USER)
+            session.add(admin_user)
+            await session.flush()
+            print(f"Created admin user: {admin_user.username}")
+
+        world = WorldBook(**HOGWARTS_WORLD, created_by=admin_user.id)
         session.add(world)
         await session.flush()
 
