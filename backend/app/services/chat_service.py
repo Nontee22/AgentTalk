@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from collections.abc import AsyncGenerator
@@ -6,12 +7,15 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.core.config import settings
+from app.core.database import async_session_maker
 from app.models.character import Character
 from app.models.conversation import Conversation
 from app.models.message import Message
+from app.models.user import User
 from app.models.world import WorldBook
 from app.services.llm_service import chat_stream, generate_title
-from app.services.prompt_builder import build_messages, build_system_prompt
+from app.services.prompt_builder import build_messages, build_system_prompt, format_memories_block
 from app.services.stream_registry import (
     is_cancelled,
     register_stream,
@@ -93,7 +97,24 @@ async def send_message_stream(
     history = list(result.scalars().all())
 
     system_prompt = build_system_prompt(world, character)
-    messages = build_messages(system_prompt, history[:-1], user_content)
+
+    # Retrieve relevant long-term memories
+    memory_block = ""
+    if settings.memory_enabled and conversation.user_id:
+        try:
+            from app.services.memory_service import retrieve_relevant_memories
+
+            memories = await retrieve_relevant_memories(
+                db=db,
+                user_id=conversation.user_id,
+                character_id=conversation.character_id,
+                query_text=user_content,
+            )
+            memory_block = format_memories_block(memories)
+        except Exception:
+            logger.warning("Memory retrieval failed, continuing without memories", exc_info=True)
+
+    messages = build_messages(system_prompt, history[:-1], user_content, memory_block=memory_block)
 
     cancel_event = register_stream(conversation_id)
     response_parts: list[str] = []
@@ -124,6 +145,16 @@ async def send_message_stream(
             if title:
                 conversation.title = title
                 await db.commit()
+
+        # Trigger async memory extraction (non-blocking)
+        if settings.memory_enabled:
+            asyncio.create_task(
+                _maybe_extract_memories(
+                    user_id=conversation.user_id,
+                    character_id=conversation.character_id,
+                    conversation_id=conversation.id,
+                )
+            )
 
 
 async def get_conversations(
@@ -195,3 +226,57 @@ async def delete_conversation(db: AsyncSession, conversation_id: uuid.UUID) -> b
     await db.delete(conversation)
     await db.commit()
     return True
+
+
+async def _maybe_extract_memories(
+    user_id: uuid.UUID | None,
+    character_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+) -> None:
+    """Background task: extract memories if enough new messages since last extraction."""
+    if not user_id:
+        return
+
+    try:
+        async with async_session_maker() as db:
+            conversation = await db.get(Conversation, conversation_id)
+            if not conversation:
+                return
+
+            delta = conversation.message_count - conversation.last_memory_extraction_at_count
+            if delta < settings.memory_extraction_min_messages:
+                return
+
+            result = await db.execute(
+                select(Message)
+                .where(Message.conversation_id == conversation_id)
+                .order_by(Message.created_at.desc())
+                .limit(settings.memory_extraction_min_messages)
+            )
+            messages = [
+                {"role": m.role, "content": m.content}
+                for m in reversed(list(result.scalars()))
+            ]
+
+            character = await db.get(Character, character_id)
+            user = await db.get(User, user_id)
+            if not character or not user:
+                return
+
+            from app.services.memory_service import extract_memories
+
+            await extract_memories(
+                db=db,
+                user_id=user_id,
+                character_id=character_id,
+                conversation_id=conversation_id,
+                character_name=character.name,
+                username=user.nickname or user.username,
+                messages=messages,
+            )
+
+            conversation.last_memory_extraction_at_count = conversation.message_count
+            await db.commit()
+
+    except Exception:
+        logger.exception("Memory extraction failed for conv=%s", conversation_id)

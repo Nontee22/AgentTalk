@@ -22,3 +22,17 @@ export interface ChatStartResponse {
   conversation_id: string
   greeting_message: ChatMessage | null
 }
+
+export interface CharacterMemory {
+  id: string
+  content: string
+  category: 'fact' | 'relationship' | 'preference' | 'event'
+  importance: number
+  created_at: string
+  last_accessed_at: string
+}
+
+export interface MemoryListResponse {
+  memories: CharacterMemory[]
+  total: number
+}

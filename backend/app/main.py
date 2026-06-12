@@ -8,6 +8,7 @@ from app.api.auth import router as auth_router
 from app.api.characters import router as characters_router
 from app.api.chat import router as chat_router
 from app.api.health import router as health_router
+from app.api.memory import router as memory_router
 from app.api.upload import router as upload_router
 from app.api.worlds import router as worlds_router
 from app.core.config import PROJECT_ROOT
@@ -47,6 +48,7 @@ app.include_router(worlds_router, prefix="/api")
 app.include_router(characters_router, prefix="/api")
 app.include_router(upload_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(memory_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn

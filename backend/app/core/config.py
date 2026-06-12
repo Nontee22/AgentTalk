@@ -32,6 +32,15 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 2048
     llm_temperature: float = 0.85
 
+    # Memory settings
+    memory_enabled: bool = True
+    memory_embedding_model: str = "BAAI/bge-small-zh-v1.5"
+    memory_embedding_dimension: int = 512
+    memory_max_per_query: int = 5
+    memory_token_budget: int = 1500
+    memory_decay_halflife_days: float = 30.0
+    memory_extraction_min_messages: int = 6
+
     @property
     def database_url(self) -> str:
         return (

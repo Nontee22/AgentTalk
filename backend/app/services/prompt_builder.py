@@ -48,13 +48,37 @@ def build_system_prompt(world: WorldBook, character: Character) -> str:
     return "\n\n".join(sections)
 
 
+def format_memories_block(memories: list[dict]) -> str:
+    """Format retrieved memories into a prompt block."""
+    if not memories:
+        return ""
+
+    category_labels = {
+        "fact": "事实",
+        "relationship": "关系",
+        "preference": "偏好",
+        "event": "事件",
+    }
+    lines = ["【长期记忆 - 你与用户之前互动中记住的信息】"]
+    for m in memories:
+        tag = category_labels.get(m["category"], "记忆")
+        lines.append(f"- [{tag}] {m['content']}")
+    lines.append("（请自然地运用以上记忆，不要直接引用或列举它们）")
+    return "\n".join(lines)
+
+
 def build_messages(
     system_prompt: str,
     history: list[Message],
     user_input: str,
     max_history: int = 20,
     max_context_tokens: int = 6000,
+    memory_block: str = "",
 ) -> list[dict[str, str]]:
+    # Inject memory block into system prompt
+    if memory_block:
+        system_prompt = system_prompt + "\n\n" + memory_block
+
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
 
     system_tokens = estimate_tokens(system_prompt)

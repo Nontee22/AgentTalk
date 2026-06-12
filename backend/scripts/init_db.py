@@ -14,7 +14,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.database import Base, engine
-from app.models import User, WorldBook, Character, Conversation, Message  # noqa: F401
+from sqlalchemy import text
+from app.models import User, WorldBook, Character, Conversation, Message, CharacterMemory  # noqa: F401
 
 
 async def recreate_tables():
@@ -22,8 +23,10 @@ async def recreate_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         print("已删除所有表。")
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        print("已启用 pgvector 扩展。")
         await conn.run_sync(Base.metadata.create_all)
-        print("已重新创建所有表：users, world_books, characters, conversations, messages")
+        print("已重新创建所有表：users, world_books, characters, conversations, messages, character_memories")
     await engine.dispose()
 
 

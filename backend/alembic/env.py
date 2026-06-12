@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import settings
 from app.core.database import Base
-from app.models import User, WorldBook, Character, Conversation, Message  # noqa: F401 — register models for autogenerate
+from app.models import User, WorldBook, Character, Conversation, Message, CharacterMemory  # noqa: F401 — register models for autogenerate
 
 config = context.config
 if config.config_file_name is not None:

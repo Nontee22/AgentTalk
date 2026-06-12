@@ -48,6 +48,22 @@ async def chat_stream(
         raise LLMStreamError("模型生成中断", model=model) from e
 
 
+async def generate_completion(prompt: str, max_tokens: int = 1024) -> str:
+    """Non-streaming completion for internal use (memory extraction, etc.)."""
+    model = settings.llm_model
+    try:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+            temperature=0.3,
+        )
+        return response.choices[0].message.content or ""
+    except Exception as e:
+        logger.warning("generate_completion failed: %s", e)
+        return ""
+
+
 async def generate_title(user_msg: str, assistant_msg: str) -> str:
     model = settings.llm_model
     try:

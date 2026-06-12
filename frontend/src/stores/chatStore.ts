@@ -10,6 +10,7 @@ import {
   stopGeneration,
 } from '@/api/chat'
 import { useToast } from '@/composables/useToast'
+import { useMemoryStore } from '@/stores/memoryStore'
 import type { ChatMessage, ConversationSummary } from '@/types/chat'
 
 export const useChatStore = defineStore('chat', () => {
@@ -80,6 +81,13 @@ export const useChatStore = defineStore('chat', () => {
         streamingContent.value = ''
         streaming.value = false
         fetchConversations()
+        // 记忆提取是后台异步的，延迟刷新一次记忆面板
+        const memoryStore = useMemoryStore()
+        window.setTimeout(() => {
+          if (memoryStore.currentCharacterId) {
+            memoryStore.loadMemories(memoryStore.currentCharacterId)
+          }
+        }, 8000)
       },
       (error) => {
         messages.value.push({

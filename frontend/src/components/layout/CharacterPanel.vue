@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { PanelRightClose } from 'lucide-vue-next'
+import { watch } from 'vue'
+import { PanelRightClose, X } from 'lucide-vue-next'
 import type { Character } from '@/types/world'
 import type { WorldBook } from '@/types/world'
 import FoldableSection from '@/components/common/FoldableSection.vue'
+import { useMemoryStore } from '@/stores/memoryStore'
+import { useToast } from '@/composables/useToast'
 
-defineProps<{
+const props = defineProps<{
   character: Character | null
   world: WorldBook | null
 }>()
@@ -12,6 +15,33 @@ defineProps<{
 defineEmits<{
   close: []
 }>()
+
+const memoryStore = useMemoryStore()
+const { showToast } = useToast()
+
+const categoryLabels: Record<string, string> = {
+  fact: '事实',
+  relationship: '关系',
+  preference: '偏好',
+  event: '事件',
+}
+
+watch(
+  () => props.character?.id,
+  (id) => {
+    if (id) memoryStore.loadMemories(id)
+  },
+  { immediate: true },
+)
+
+async function handleDeleteMemory(memoryId: string) {
+  try {
+    await memoryStore.removeMemory(memoryId)
+    showToast('记忆已删除', 'success')
+  } catch {
+    showToast('删除失败', 'error')
+  }
+}
 </script>
 
 <template>
@@ -60,6 +90,39 @@ defineEmits<{
         </FoldableSection>
         <FoldableSection v-if="character.knowledge" title="已知信息">
           {{ character.knowledge }}
+        </FoldableSection>
+      </div>
+
+      <!-- Memory Section -->
+      <div class="mt-4 pt-4 border-t border-white/[0.06]">
+        <FoldableSection :title="`长期记忆 (${memoryStore.memories.length})`">
+          <div v-if="memoryStore.loading" class="text-text-muted text-[10px] py-2">
+            加载中...
+          </div>
+          <div v-else-if="memoryStore.memories.length === 0" class="text-text-muted text-[10px] py-2">
+            暂无记忆，多聊几次后会自动记住重要信息
+          </div>
+          <div v-else class="space-y-2 max-h-[240px] overflow-y-auto">
+            <div
+              v-for="memory in memoryStore.memories"
+              :key="memory.id"
+              class="group flex items-start gap-1.5 py-1.5 px-2 rounded-md hover:bg-white/[0.03] transition-colors"
+            >
+              <span class="shrink-0 text-[9px] px-1 py-0.5 rounded bg-accent-dim text-accent/80 mt-0.5">
+                {{ categoryLabels[memory.category] || '记忆' }}
+              </span>
+              <span class="flex-1 text-text-secondary text-[11px] leading-relaxed">
+                {{ memory.content }}
+              </span>
+              <button
+                class="shrink-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 text-text-muted hover:text-red-400 transition-all mt-0.5"
+                title="删除此记忆"
+                @click="handleDeleteMemory(memory.id)"
+              >
+                <X :size="10" />
+              </button>
+            </div>
+          </div>
         </FoldableSection>
       </div>
 
