@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Embedding service — lazy-loads sentence-transformers model for vector generation."""
+"""Embedding service — lazy-loads sentence-transformers model for vector generation.
+
+NOTE: The model loads in the web process on first request (~2-5s, ~200MB RAM).
+For production, consider pre-loading in lifespan or offloading to a worker process.
+"""
 
 import asyncio
 import logging
@@ -33,7 +37,7 @@ async def _get_model() -> SentenceTransformer:
                     "Loading embedding model: %s ...",
                     model_path,
                 )
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 _model = await loop.run_in_executor(
                     None,
                     lambda: SentenceTransformer(model_path),
@@ -45,7 +49,7 @@ async def _get_model() -> SentenceTransformer:
 async def generate_embedding(text: str) -> list[float]:
     """Generate embedding vector for a single text string."""
     model = await _get_model()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     vector = await loop.run_in_executor(
         None,
         lambda: model.encode(text, normalize_embeddings=True).tolist(),
@@ -58,7 +62,7 @@ async def generate_embeddings(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     model = await _get_model()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     vectors = await loop.run_in_executor(
         None,
         lambda: model.encode(texts, normalize_embeddings=True).tolist(),

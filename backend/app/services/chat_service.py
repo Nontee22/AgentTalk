@@ -37,6 +37,12 @@ async def start_conversation(
     if not character:
         raise ValueError("Character not found")
 
+    world = await db.get(WorldBook, world_id)
+    if not world:
+        raise ValueError("World not found")
+    if character.world_id != world_id:
+        raise ValueError("角色不属于该世界书")
+
     conversation = Conversation(
         character_id=character_id,
         world_id=world_id,
@@ -92,9 +98,10 @@ async def send_message_stream(
     result = await db.execute(
         select(Message)
         .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at)
+        .order_by(Message.created_at.desc())
+        .limit(20)
     )
-    history = list(result.scalars().all())
+    history = list(reversed(list(result.scalars().all())))
 
     system_prompt = build_system_prompt(world, character)
 
@@ -158,8 +165,9 @@ async def send_message_stream(
 
 
 async def get_conversations(
-    db: AsyncSession, *, user_id: uuid.UUID | None = None
-) -> list[dict]:
+    db: AsyncSession, *, user_id: uuid.UUID | None = None,
+    page: int = 1, page_size: int = 20,
+) -> tuple[list[dict], int]:
     last_msg_subq = (
         select(Message.content)
         .where(Message.conversation_id == Conversation.id)
@@ -169,12 +177,23 @@ async def get_conversations(
         .scalar_subquery()
     )
 
+    base = select(Conversation)
+    if user_id is not None:
+        base = base.where(Conversation.user_id == user_id)
+
+    total = await db.scalar(
+        select(func.count(Conversation.id)).where(
+            Conversation.user_id == user_id
+        ) if user_id else select(func.count(Conversation.id))
+    ) or 0
+
     query = select(Conversation, last_msg_subq.label("last_message_content")).options(
         joinedload(Conversation.character)
     )
     if user_id is not None:
         query = query.where(Conversation.user_id == user_id)
     query = query.order_by(Conversation.updated_at.desc())
+    query = query.offset((page - 1) * page_size).limit(page_size)
 
     result = await db.execute(query)
     rows = result.unique().all()
@@ -193,7 +212,7 @@ async def get_conversations(
             "updated_at": conv.updated_at,
         })
 
-    return items
+    return items, total
 
 
 async def get_messages(
@@ -277,6 +296,16 @@ async def _maybe_extract_memories(
 
             conversation.last_memory_extraction_at_count = conversation.message_count
             await db.commit()
+
+            # Notify connected clients that new memories are available
+            from app.services.event_bus import publish
+
+            await publish(user_id, {
+                "event": "memory_ready",
+                "data": {
+                    "character_id": str(character_id),
+                },
+            })
 
     except Exception:
         logger.exception("Memory extraction failed for conv=%s", conversation_id)

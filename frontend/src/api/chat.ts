@@ -1,6 +1,34 @@
 import api from '@/api'
+import { refreshToken as apiRefresh } from '@/api/auth'
 import type { PaginatedResponse } from '@/types/common'
 import type { ChatMessage, ChatStartResponse, ConversationSummary } from '@/types/chat'
+
+/**
+ * Ensure we have a valid (non-expired) access token before SSE fetch.
+ * Returns the token string or null if unauthenticated.
+ */
+async function ensureFreshToken(): Promise<string | null> {
+  let token = localStorage.getItem('access_token')
+  if (!token) return null
+
+  // Decode JWT payload to check expiry
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const expiresAt = payload.exp * 1000
+    // Refresh if token expires within 60 seconds
+    if (Date.now() > expiresAt - 60_000) {
+      const rt = localStorage.getItem('refresh_token')
+      if (!rt) return null
+      const res = await apiRefresh(rt)
+      localStorage.setItem('access_token', res.access_token)
+      localStorage.setItem('refresh_token', res.refresh_token)
+      token = res.access_token
+    }
+  } catch {
+    // If decode fails, just use current token
+  }
+  return token
+}
 
 export async function startChat(
   characterId: string,
@@ -13,9 +41,11 @@ export async function startChat(
   return data
 }
 
-export async function getConversations(): Promise<ConversationSummary[]> {
-  const { data } = await api.get('/chat/conversations')
-  return data
+export async function getConversations(page = 1, pageSize = 20): Promise<ConversationSummary[]> {
+  const { data } = await api.get('/chat/conversations', {
+    params: { page, page_size: pageSize },
+  })
+  return data.items
 }
 
 export async function getMessages(
@@ -48,77 +78,94 @@ export function sendMessageSSE(
 ): AbortController {
   const controller = new AbortController()
 
-  function attempt(retryCount: number) {
-    fetch(`/api/chat/${conversationId}/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('access_token')
-          ? { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
-          : {}),
-      },
-      body: JSON.stringify({ content }),
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (response.status === 401) {
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-          window.location.href = '/login'
-          return
-        }
-        if (!response.ok || !response.body) {
-          onError('连接失败')
-          return
-        }
+  async function attempt(retryCount: number) {
+    try {
+      const token = await ensureFreshToken()
 
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
+      const response = await fetch(`/api/chat/${conversationId}/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ content }),
+        signal: controller.signal,
+      })
 
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            const payload = line.slice(6).trim()
-
-            if (payload === '[DONE]') {
-              onDone()
+      if (response.status === 401) {
+        // Token might have just expired — try one refresh
+        const rt = localStorage.getItem('refresh_token')
+        if (rt) {
+          try {
+            const res = await apiRefresh(rt)
+            localStorage.setItem('access_token', res.access_token)
+            localStorage.setItem('refresh_token', res.refresh_token)
+            // Retry with new token
+            if (retryCount < 1) {
+              attempt(retryCount + 1)
               return
             }
-
-            try {
-              const parsed = JSON.parse(payload)
-              if (parsed.error) {
-                onError(parsed.error)
-                return
-              }
-              if (parsed.token) {
-                onToken(parsed.token)
-              }
-            } catch {
-              // skip malformed lines
-            }
+          } catch {
+            // Refresh failed
           }
         }
-        onDone()
-      })
-      .catch((err) => {
-        if (err.name === 'AbortError') return
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        window.location.href = '/login'
+        return
+      }
 
-        if (retryCount < maxRetries) {
-          onRetry?.(retryCount + 1)
-          setTimeout(() => attempt(retryCount + 1), 1000)
-        } else {
-          onError('网络连接失败，已重试 3 次')
+      if (!response.ok || !response.body) {
+        onError('连接失败')
+        return
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const payload = line.slice(6).trim()
+
+          if (payload === '[DONE]') {
+            onDone()
+            return
+          }
+
+          try {
+            const parsed = JSON.parse(payload)
+            if (parsed.error) {
+              onError(parsed.error)
+              return
+            }
+            if (parsed.token) {
+              onToken(parsed.token)
+            }
+          } catch {
+            // skip malformed lines
+          }
         }
-      })
+      }
+      onDone()
+    } catch (err: any) {
+      if (err.name === 'AbortError') return
+
+      if (retryCount < maxRetries) {
+        onRetry?.(retryCount + 1)
+        setTimeout(() => attempt(retryCount + 1), 1000)
+      } else {
+        onError('网络连接失败，已重试 3 次')
+      }
+    }
   }
 
   attempt(0)

@@ -28,6 +28,14 @@ export default {
       borderRadius: {
         card: '12px',
       },
+      animation: {
+        blink: 'blink 0.8s step-end infinite',
+      },
+      keyframes: {
+        blink: {
+          '50%': { opacity: '0' },
+        },
+      },
     },
   },
   plugins: [],

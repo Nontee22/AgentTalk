@@ -1,3 +1,10 @@
+"""In-process stream cancellation registry.
+
+NOTE: This is process-local — in a multi-worker deployment (e.g. gunicorn with
+multiple workers), a cancel request may land on a different worker than the one
+running the stream. For production multi-worker setups, migrate to Redis pub/sub.
+"""
+
 import asyncio
 import uuid
 

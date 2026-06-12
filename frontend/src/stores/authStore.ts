@@ -1,6 +1,5 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { useRouter } from 'vue-router'
 
 import { login as apiLogin, register as apiRegister, getProfile } from '@/api/auth'
 import { useToast } from '@/composables/useToast'

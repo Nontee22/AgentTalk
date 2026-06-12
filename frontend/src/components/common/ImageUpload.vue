@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Upload, X } from 'lucide-vue-next'
+import { useToast } from '@/composables/useToast'
 
 const props = defineProps<{
   modelValue: string | null
@@ -12,6 +13,7 @@ const emit = defineEmits<{
   'upload': [file: File]
 }>()
 
+const { showToast } = useToast()
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement>()
 
@@ -34,6 +36,10 @@ function handleFileSelect(e: Event) {
 }
 
 function emitUpload(file: File) {
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('文件大小不能超过 5MB', 'error')
+    return
+  }
   emit('upload', file)
 }
 
@@ -67,6 +73,7 @@ function clear() {
       <img :src="previewUrl" alt="Preview" class="w-full h-48 object-cover" />
       <button
         class="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+        aria-label="移除图片"
         @click.stop="clear"
       >
         <X :size="14" />

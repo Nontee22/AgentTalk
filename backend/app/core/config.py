@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     llm_model: str = "deepseek-chat"
     llm_max_tokens: int = 2048
     llm_temperature: float = 0.85
+    llm_max_context_tokens: int = 6000
 
     # Memory settings
     memory_enabled: bool = True
@@ -39,7 +40,9 @@ class Settings(BaseSettings):
     memory_max_per_query: int = 5
     memory_token_budget: int = 1500
     memory_decay_halflife_days: float = 30.0
-    memory_extraction_min_messages: int = 6
+    memory_extraction_min_messages: int = 4
+
+    cors_origins: str = "http://localhost:5173"
 
     @property
     def database_url(self) -> str:

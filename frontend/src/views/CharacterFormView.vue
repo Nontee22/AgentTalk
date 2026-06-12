@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import { getCharacter, createCharacter, updateCharacter } from '@/api/characters'
 import { uploadImage } from '@/api/upload'
+import { useToast } from '@/composables/useToast'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import TagInput from '@/components/common/TagInput.vue'
 import type { CharacterCreate, CharacterUpdate } from '@/types/world'
@@ -16,6 +17,7 @@ const characterId = computed(() => route.params.id as string | undefined)
 const worldId = computed(() => route.params.worldId as string | undefined)
 const saving = ref(false)
 const resolvedWorldId = ref('')
+const { showToast } = useToast()
 
 const form = ref<CharacterCreate>({
   name: '',
@@ -32,19 +34,24 @@ const form = ref<CharacterCreate>({
 
 onMounted(async () => {
   if (isEdit.value && characterId.value) {
-    const char = await getCharacter(characterId.value)
-    resolvedWorldId.value = char.world_id
-    form.value = {
-      name: char.name,
-      avatar: char.avatar || undefined,
-      identity: char.identity || '',
-      personality: char.personality || '',
-      background: char.background || '',
-      relationships: char.relationships || '',
-      language_style: char.language_style || '',
-      knowledge: char.knowledge || '',
-      greeting: char.greeting || '',
-      tags: char.tags || [],
+    try {
+      const char = await getCharacter(characterId.value)
+      resolvedWorldId.value = char.world_id
+      form.value = {
+        name: char.name,
+        avatar: char.avatar || undefined,
+        identity: char.identity || '',
+        personality: char.personality || '',
+        background: char.background || '',
+        relationships: char.relationships || '',
+        language_style: char.language_style || '',
+        knowledge: char.knowledge || '',
+        greeting: char.greeting || '',
+        tags: char.tags || [],
+      }
+    } catch {
+      showToast('加载角色信息失败', 'error')
+      router.back()
     }
   } else if (worldId.value) {
     resolvedWorldId.value = worldId.value
@@ -68,6 +75,8 @@ async function handleSubmit() {
       await createCharacter(resolvedWorldId.value, form.value)
       router.push({ name: 'world-detail', params: { id: resolvedWorldId.value } })
     }
+  } catch {
+    showToast('保存失败，请重试', 'error')
   } finally {
     saving.value = false
   }

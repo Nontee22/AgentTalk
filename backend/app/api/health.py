@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.core.database import async_session_maker, redis_client
@@ -23,4 +24,5 @@ async def health_check():
         result["redis"] = "disconnected"
         result["status"] = "degraded"
 
-    return result
+    status_code = 200 if result["status"] == "healthy" else 503
+    return JSONResponse(content=result, status_code=status_code)

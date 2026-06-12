@@ -53,6 +53,7 @@ async function handleDeleteMemory(memoryId: string) {
       <span class="text-xs text-text-muted">角色信息</span>
       <button
         class="p-1 rounded hover:bg-white/[0.06] text-text-muted hover:text-text-primary transition-colors"
+        aria-label="关闭面板"
         @click="$emit('close')"
       >
         <PanelRightClose :size="14" />

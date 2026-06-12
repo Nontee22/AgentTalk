@@ -24,4 +24,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+# Redis client — currently used for health checks only.
+# Planned uses: session cache, rate limiting (multi-worker), stream cancellation pub/sub.
 redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)

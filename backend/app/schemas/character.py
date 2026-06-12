@@ -7,27 +7,27 @@ from pydantic import BaseModel, Field
 class CharacterCreate(BaseModel):
     name: str = Field(..., max_length=100)
     avatar: str | None = None
-    identity: str | None = None
-    personality: str | None = None
-    background: str | None = None
-    relationships: str | None = None
-    language_style: str | None = None
-    knowledge: str | None = None
-    greeting: str | None = None
-    tags: list[str] | None = None
+    identity: str | None = Field(None, max_length=500)
+    personality: str | None = Field(None, max_length=5000)
+    background: str | None = Field(None, max_length=5000)
+    relationships: str | None = Field(None, max_length=3000)
+    language_style: str | None = Field(None, max_length=3000)
+    knowledge: str | None = Field(None, max_length=5000)
+    greeting: str | None = Field(None, max_length=2000)
+    tags: list[str] | None = Field(None, max_length=20)
 
 
 class CharacterUpdate(BaseModel):
     name: str | None = Field(None, max_length=100)
     avatar: str | None = None
-    identity: str | None = None
-    personality: str | None = None
-    background: str | None = None
-    relationships: str | None = None
-    language_style: str | None = None
-    knowledge: str | None = None
-    greeting: str | None = None
-    tags: list[str] | None = None
+    identity: str | None = Field(None, max_length=500)
+    personality: str | None = Field(None, max_length=5000)
+    background: str | None = Field(None, max_length=5000)
+    relationships: str | None = Field(None, max_length=3000)
+    language_style: str | None = Field(None, max_length=3000)
+    knowledge: str | None = Field(None, max_length=5000)
+    greeting: str | None = Field(None, max_length=2000)
+    tags: list[str] | None = Field(None, max_length=20)
 
 
 class CharacterSummary(BaseModel):

@@ -11,7 +11,22 @@ const showHeader = computed(() => !route.meta.guest)
 <template>
   <div class="min-h-screen bg-bg-base">
     <AppHeader v-if="showHeader" />
-    <RouterView />
+    <RouterView v-slot="{ Component }">
+      <Transition name="page" mode="out-in">
+        <component :is="Component" />
+      </Transition>
+    </RouterView>
     <ToastContainer />
   </div>
 </template>
+
+<style>
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.15s ease;
+}
+.page-enter-from,
+.page-leave-to {
+  opacity: 0;
+}
+</style>

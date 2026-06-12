@@ -10,7 +10,6 @@ import {
   stopGeneration,
 } from '@/api/chat'
 import { useToast } from '@/composables/useToast'
-import { useMemoryStore } from '@/stores/memoryStore'
 import type { ChatMessage, ConversationSummary } from '@/types/chat'
 
 export const useChatStore = defineStore('chat', () => {
@@ -46,13 +45,6 @@ export const useChatStore = defineStore('chat', () => {
         streamingContent.value = ''
         streaming.value = false
         fetchConversations()
-        // 记忆提取是后台异步的，延迟刷新一次记忆面板
-        const memoryStore = useMemoryStore()
-        window.setTimeout(() => {
-          if (memoryStore.currentCharacterId) {
-            memoryStore.loadMemories(memoryStore.currentCharacterId)
-          }
-        }, 8000)
       },
       (error) => {
         messages.value.push({
@@ -157,13 +149,17 @@ export const useChatStore = defineStore('chat', () => {
     const errorIdx = messages.value.map((m) => m.error).lastIndexOf(true)
     if (errorIdx === -1) return
 
+    // Find the user message that triggered the error
+    const lastUserMsg = messages.value
+      .slice(0, errorIdx)
+      .reverse()
+      .find((m) => m.role === 'user')
+    if (!lastUserMsg || !currentConversationId.value) return
+
+    // Remove only the error message, keep the user message
     messages.value.splice(errorIdx, 1)
 
-    const lastUserMsg = [...messages.value].reverse().find((m) => m.role === 'user')
-    if (!lastUserMsg) return
-
-    messages.value = messages.value.filter((m) => m.id !== lastUserMsg.id)
-    sendMessage(lastUserMsg.content)
+    _startStream(currentConversationId.value, lastUserMsg.content)
   }
 
   function stopStreaming() {

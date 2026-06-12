@@ -1,3 +1,4 @@
+from app.core.config import settings
 from app.models.character import Character
 from app.models.message import Message
 from app.models.world import WorldBook
@@ -72,9 +73,11 @@ def build_messages(
     history: list[Message],
     user_input: str,
     max_history: int = 20,
-    max_context_tokens: int = 6000,
+    max_context_tokens: int | None = None,
     memory_block: str = "",
 ) -> list[dict[str, str]]:
+    if max_context_tokens is None:
+        max_context_tokens = settings.llm_max_context_tokens
     # Inject memory block into system prompt
     if memory_block:
         system_prompt = system_prompt + "\n\n" + memory_block
