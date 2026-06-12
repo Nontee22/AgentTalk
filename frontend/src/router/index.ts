@@ -1,7 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior: () => ({ top: 0 }),
   routes: [
     {
       path: '/',
@@ -54,18 +56,22 @@ const router = createRouter({
       name: 'chat',
       component: () => import('@/views/ChatView.vue'),
     },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFoundView.vue'),
+    },
   ],
 })
 
 router.beforeEach((to) => {
-  const token = localStorage.getItem('access_token')
-  const isAuthenticated = !!token
+  const auth = useAuthStore()
 
-  if (!to.meta.guest && !isAuthenticated) {
+  if (!to.meta.guest && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  if (to.meta.guest && isAuthenticated) {
+  if (to.meta.guest && auth.isAuthenticated) {
     return { name: 'worlds' }
   }
 })

@@ -50,3 +50,6 @@ class Conversation(Base):
         Index("ix_conversations_user_id", "user_id"),
         Index("ix_conversations_character_id", "character_id"),
     )
+
+    def __repr__(self) -> str:
+        return f"<Conversation {self.title!r} id={self.id}>"

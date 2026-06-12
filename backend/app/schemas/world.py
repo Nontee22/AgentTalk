@@ -6,24 +6,24 @@ from pydantic import BaseModel, Field
 
 class WorldBookCreate(BaseModel):
     name: str = Field(..., max_length=100)
-    description: str | None = None
-    setting: str | None = None
-    rules: str | None = None
-    lore: str | None = None
-    factions: list[str] | None = None
-    tags: list[str] | None = None
+    description: str | None = Field(None, max_length=500)
+    setting: str | None = Field(None, max_length=10000)
+    rules: str | None = Field(None, max_length=10000)
+    lore: str | None = Field(None, max_length=10000)
+    factions: list[str] | None = Field(None, max_length=50)
+    tags: list[str] | None = Field(None, max_length=20)
     cover_image: str | None = None
     is_preset: bool = False
 
 
 class WorldBookUpdate(BaseModel):
     name: str | None = Field(None, max_length=100)
-    description: str | None = None
-    setting: str | None = None
-    rules: str | None = None
-    lore: str | None = None
-    factions: list[str] | None = None
-    tags: list[str] | None = None
+    description: str | None = Field(None, max_length=500)
+    setting: str | None = Field(None, max_length=10000)
+    rules: str | None = Field(None, max_length=10000)
+    lore: str | None = Field(None, max_length=10000)
+    factions: list[str] | None = Field(None, max_length=50)
+    tags: list[str] | None = Field(None, max_length=20)
     cover_image: str | None = None
     is_preset: bool | None = None
 

@@ -1,0 +1,98 @@
+### 5. 动态标签
+
+世界书标签目前写死 4 个（奇幻/科幻/历史/现实）
+
+- 标签从数据库动态聚合，支持热门标签排序
+
+**预计工作量**：2-3 小时
+
+---
+
+### 7. 前端状态管理拆分
+
+`chatStore` 已达 215 行，职责过多。
+
+- 拆分为 `conversationStore`（列表/CRUD）+ `streamStore`（SSE 流式状态）
+- `api/chat.ts` 的 SSE token 刷新逻辑与 `api/index.ts` 的 axios 拦截器统一
+- 考虑引入 `composables/useSSE.ts` 封装流式通信
+
+**预计工作量**：3-4 小时
+
+### 8. 后端服务层拆分
+
+`chat_service.py` 同时处理消息存储 + 流式输出 + 记忆触发。
+
+- 拆分为：
+  - `message_service`：消息 CRUD、历史查询
+  - `stream_service`：SSE 流式输出、取消控制
+  - `memory_trigger`：后台记忆提取任务调度
+- 降低单文件复杂度，便于测试
+
+**预计工作量**：2-3 小时
+
+### 9. 多 Worker 生产支持
+
+当前进程级内存组件在多 worker 部署下失效。
+
+| 组件 | 当前实现 | 生产方案 |
+|------|----------|----------|
+| `stream_registry` | 进程内 dict | Redis pub/sub |
+| `rate_limit` | 进程内 dict | Redis INCR + EXPIRE |
+| `embedding model` | 进程内加载 | 独立 embedding 微服务或共享内存 |
+
+**预计工作量**：1 天
+
+---
+
+### 10. 消息无限滚动
+
+后端已支持分页，但前端一次加载 50 条后不再加载更多。
+
+- `ChatView` 监听 `messagesContainer` 的 `scrollTop === 0` 事件
+- 触发时加载上一页，插入到列表头部，保持滚动位置
+- 增加"加载更多"的 loading 指示器
+
+**预计工作量**：2-3 小时
+
+### 11. 嵌入模型预加载
+
+首次记忆操作阻塞 2-5 秒加载模型。
+
+- 方案：独立 embedding worker 进程，通过 HTTP/消息队列调用
+- 方案额外好处：web 进程不需要 ~200MB 的 PyTorch 依赖
+
+**预计工作量**：方案半天
+
+### 12. LLM 异步任务优化
+
+记忆提取和标题生成目前用 `asyncio.create_task` 在 web 进程内执行。
+
+- 短期：确保异常不会导致未 await 的 task 泄漏
+- 长期：引入轻量任务队列（arq / SAQ），LLM 调用在 worker 进程执行
+- 好处：web 进程专注请求处理，LLM 重计算不影响响应延迟
+
+**预计工作量**：半天（arq 方案）
+
+---
+
+### 16. 打字机效果优化
+
+当前 token 级别直接拼接，速度不均匀。
+
+- 增加 token 缓冲队列，以固定间隔（~30ms）逐字符渲染
+- 长 token（如代码块）一次性输出，短 token 模拟逐字效果
+- 用 `requestAnimationFrame` 替代直接赋值，减少重渲染
+
+**预计工作量**：2-3 小时
+
+### 17. 表单离开提醒
+
+世界书/角色编辑页面，编辑中离开会丢失内容。
+
+- `WorldFormView` / `CharacterFormView` 增加 `isDirty` 计算属性
+- `onBeforeRouteLeave` 守卫：有未保存更改时弹出 ConfirmDialog
+- 浏览器 `beforeunload` 事件兜底
+
+**预计工作量**：1 小时
+
+---

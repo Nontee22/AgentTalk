@@ -3,6 +3,8 @@ import { onMounted, ref, nextTick, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PanelRight } from 'lucide-vue-next'
 import { useChatStore } from '@/stores/chatStore'
+import { useMemoryStore } from '@/stores/memoryStore'
+import { useEventStream } from '@/composables/useEventStream'
 import { getCharacter } from '@/api/characters'
 import { getWorld } from '@/api/worlds'
 import { renderMarkdown } from '@/utils/markdown'
@@ -16,6 +18,7 @@ import type { Character, WorldBook } from '@/types/world'
 const route = useRoute()
 const router = useRouter()
 const store = useChatStore()
+const memoryStore = useMemoryStore()
 
 const character = ref<Character | null>(null)
 const world = ref<WorldBook | null>(null)
@@ -78,6 +81,15 @@ onMounted(async () => {
   }
 })
 
+// SSE side-channel: listen for real-time events from backend
+useEventStream({
+  onMemoryReady: (data) => {
+    if (data.character_id === character.value?.id) {
+      memoryStore.loadMemories(data.character_id)
+    }
+  },
+})
+
 async function handleSelectConversation(id: string) {
   router.push({ name: 'chat', params: { conversationId: id } })
 }
@@ -128,6 +140,7 @@ function handleNewChat() {
         </div>
         <button
           class="p-1.5 rounded-lg hover:bg-white/[0.06] text-text-muted hover:text-text-primary transition-colors"
+          aria-label="切换角色面板"
           @click="showPanel = !showPanel"
         >
           <PanelRight :size="16" />
@@ -165,7 +178,7 @@ function handleNewChat() {
               <div
                 class="rounded-xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed bg-bg-surface text-text-primary border border-white/[0.06] markdown-body"
               >
-                <span v-html="streamingHtml" /><span class="inline-block w-0.5 h-4 bg-accent animate-pulse ml-0.5 align-text-bottom" />
+                <span v-html="streamingHtml" /><span class="inline-block w-0.5 h-4 bg-accent animate-blink ml-0.5 align-text-bottom" />
               </div>
             </div>
           </div>

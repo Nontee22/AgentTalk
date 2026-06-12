@@ -1,11 +1,12 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.rate_limit import get_client_ip, login_limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -44,11 +45,16 @@ async def register(
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(
     data: LoginRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    client_ip = get_client_ip(request)
+    login_limiter.check(client_ip)
+
     try:
         user = await auth_service.login(db, data.username, data.password)
     except ValueError as e:
+        login_limiter.record(client_ip)
         raise HTTPException(status_code=401, detail=str(e))
 
     return TokenResponse(

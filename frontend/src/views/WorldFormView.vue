@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-vue-next'
 import { getWorld } from '@/api/worlds'
 import { useWorldStore } from '@/stores/worldStore'
 import { uploadImage } from '@/api/upload'
+import { useToast } from '@/composables/useToast'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import TagInput from '@/components/common/TagInput.vue'
 import type { WorldBookCreate, WorldBookUpdate } from '@/types/world'
@@ -12,6 +13,7 @@ import type { WorldBookCreate, WorldBookUpdate } from '@/types/world'
 const route = useRoute()
 const router = useRouter()
 const store = useWorldStore()
+const { showToast } = useToast()
 
 const isEdit = computed(() => route.name === 'world-edit')
 const worldId = computed(() => route.params.id as string | undefined)
@@ -32,18 +34,23 @@ const factionsText = ref('')
 
 onMounted(async () => {
   if (isEdit.value && worldId.value) {
-    const world = await getWorld(worldId.value)
-    form.value = {
-      name: world.name,
-      description: world.description || '',
-      setting: world.setting || '',
-      rules: world.rules || '',
-      lore: world.lore || '',
-      factions: world.factions || [],
-      tags: world.tags || [],
-      cover_image: world.cover_image || undefined,
+    try {
+      const world = await getWorld(worldId.value)
+      form.value = {
+        name: world.name,
+        description: world.description || '',
+        setting: world.setting || '',
+        rules: world.rules || '',
+        lore: world.lore || '',
+        factions: world.factions || [],
+        tags: world.tags || [],
+        cover_image: world.cover_image || undefined,
+      }
+      factionsText.value = (world.factions || []).join('\n')
+    } catch {
+      showToast('加载世界书失败', 'error')
+      router.back()
     }
-    factionsText.value = (world.factions || []).join('\n')
   }
 })
 
@@ -72,6 +79,8 @@ async function handleSubmit() {
       const world = await store.addWorld(data)
       router.push({ name: 'world-detail', params: { id: world.id } })
     }
+  } catch {
+    showToast('保存失败，请重试', 'error')
   } finally {
     saving.value = false
   }

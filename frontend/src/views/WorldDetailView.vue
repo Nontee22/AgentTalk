@@ -23,6 +23,7 @@ const { showToast } = useToast()
 
 const drawerOpen = ref(false)
 const selectedCharacter = ref<Character | null>(null)
+const error = ref(false)
 
 const canEdit = computed(() => {
   const world = store.currentWorld
@@ -31,13 +32,21 @@ const canEdit = computed(() => {
   return world.created_by === auth.user?.id
 })
 
-onMounted(() => {
-  store.fetchWorldDetail(route.params.id as string)
+onMounted(async () => {
+  try {
+    await store.fetchWorldDetail(route.params.id as string)
+  } catch {
+    error.value = true
+  }
 })
 
 async function openDrawer(characterId: string) {
-  selectedCharacter.value = await getCharacter(characterId)
-  drawerOpen.value = true
+  try {
+    selectedCharacter.value = await getCharacter(characterId)
+    drawerOpen.value = true
+  } catch {
+    showToast('加载角色信息失败', 'error')
+  }
 }
 
 async function handleStartChat(characterId: string) {
@@ -131,5 +140,15 @@ async function handleStartChat(characterId: string) {
 
   <div v-else-if="store.loading" class="flex items-center justify-center min-h-[60vh]">
     <div class="text-text-muted text-sm">加载中...</div>
+  </div>
+
+  <div v-else class="flex flex-col items-center justify-center min-h-[60vh] text-center">
+    <p class="text-text-muted text-sm mb-4">{{ error ? '加载失败，请稍后重试' : '世界书不存在' }}</p>
+    <button
+      class="text-accent text-sm hover:text-accent-hover transition-colors"
+      @click="router.push({ name: 'worlds' })"
+    >
+      返回世界书列表
+    </button>
   </div>
 </template>

@@ -2,12 +2,12 @@
 import { ref } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
 
-defineProps<{
+const props = defineProps<{
   title: string
   defaultOpen?: boolean
 }>()
 
-const isOpen = ref(false)
+const isOpen = ref(props.defaultOpen ?? false)
 </script>
 
 <template>

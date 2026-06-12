@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.permissions import check_world_permission
 from app.models.user import User
 from app.models.world import WorldBook
 from app.schemas.character import (
@@ -57,10 +58,7 @@ async def create_character(
     world = await db.get(WorldBook, world_id)
     if not world:
         raise HTTPException(status_code=404, detail="World not found")
-    if world.is_preset and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="预设世界书的角色仅管理员可操作")
-    if not world.is_preset and world.created_by != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="无权在此世界书下创建角色")
+    check_world_permission(world, current_user, "创建角色")
 
     character = await character_service.create_character(db, world_id, data)
     return CharacterDetail.model_validate(character)
@@ -78,10 +76,8 @@ async def update_character(
         raise HTTPException(status_code=404, detail="Character not found")
 
     world = await db.get(WorldBook, character.world_id)
-    if world and world.is_preset and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="预设世界书的角色仅管理员可操作")
-    if world and not world.is_preset and world.created_by != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="无权编辑此角色")
+    if world:
+        check_world_permission(world, current_user, "编辑角色")
 
     character = await character_service.update_character(db, character_id, data)
     return CharacterDetail.model_validate(character)
@@ -98,9 +94,7 @@ async def delete_character(
         raise HTTPException(status_code=404, detail="Character not found")
 
     world = await db.get(WorldBook, character.world_id)
-    if world and world.is_preset and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="预设世界书的角色仅管理员可操作")
-    if world and not world.is_preset and world.created_by != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="无权删除此角色")
+    if world:
+        check_world_permission(world, current_user, "删除角色")
 
     await character_service.delete_character(db, character_id)

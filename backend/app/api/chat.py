@@ -109,13 +109,22 @@ async def stop_generation(
     return {"status": "stopped"}
 
 
-@router.get("/conversations", response_model=list[ConversationSummary])
+@router.get("/conversations", response_model=PaginatedResponse[ConversationSummary])
 async def list_conversations(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    items = await chat_service.get_conversations(db, user_id=current_user.id)
-    return [ConversationSummary(**item) for item in items]
+    items, total = await chat_service.get_conversations(
+        db, user_id=current_user.id, page=page, page_size=page_size
+    )
+    return PaginatedResponse(
+        items=[ConversationSummary(**item) for item in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/{conversation_id}", response_model=PaginatedResponse[MessageOut])

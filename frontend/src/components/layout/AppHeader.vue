@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Plus, LogOut, User, ChevronDown } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/authStore'
@@ -8,6 +8,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const searchQuery = ref('')
 const showDropdown = ref(false)
+const dropdownRef = ref<HTMLDivElement>()
 
 const displayName = computed(
   () => auth.user?.nickname || auth.user?.username || '用户',
@@ -23,6 +24,15 @@ function handleLogout() {
   auth.logout()
   router.push('/login')
 }
+
+function onClickOutside(e: MouseEvent) {
+  if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) {
+    showDropdown.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onClickOutside))
+onUnmounted(() => document.removeEventListener('click', onClickOutside))
 </script>
 
 <template>
@@ -55,11 +65,10 @@ function handleLogout() {
           创建世界
         </router-link>
 
-        <div class="relative">
+        <div ref="dropdownRef" class="relative">
           <button
             class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bg-hover transition-colors"
-            @click="showDropdown = !showDropdown"
-            @blur="window.setTimeout(() => (showDropdown = false), 150)"
+            @click.stop="showDropdown = !showDropdown"
           >
             <div class="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center">
               <User :size="14" class="text-accent" />

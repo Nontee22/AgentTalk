@@ -28,4 +28,11 @@ class Message(Base):
 
     conversation = relationship("Conversation", back_populates="messages")
 
-    __table_args__ = (Index("ix_messages_conversation_id", "conversation_id"),)
+    __table_args__ = (
+        Index("ix_messages_conversation_id", "conversation_id"),
+        Index("ix_messages_conv_created", "conversation_id", "created_at"),
+    )
+
+    def __repr__(self) -> str:
+        preview = self.content[:30] + "..." if len(self.content) > 30 else self.content
+        return f"<Message {self.role} {preview!r} id={self.id}>"

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,3 +36,10 @@ class WorldBook(Base):
     characters = relationship(
         "Character", back_populates="world", cascade="all, delete-orphan"
     )
+
+    __table_args__ = (
+        Index("ix_world_books_tags_gin", "tags", postgresql_using="gin"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<WorldBook {self.name!r} id={self.id}>"

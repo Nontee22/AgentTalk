@@ -39,3 +39,6 @@ class Character(Base):
     world = relationship("WorldBook", back_populates="characters")
 
     __table_args__ = (Index("ix_characters_world_id", "world_id"),)
+
+    def __repr__(self) -> str:
+        return f"<Character {self.name!r} id={self.id}>"

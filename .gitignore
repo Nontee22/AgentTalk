@@ -31,4 +31,4 @@ Thumbs.db
 # Project
 uploads/
 *.log
-models/
+models/bge-small-zh-v1.5
