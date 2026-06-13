@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 
@@ -13,6 +14,29 @@ client = AsyncOpenAI(
     base_url=settings.llm_base_url,
     timeout=60.0,
 )
+
+# Limit concurrent background LLM calls (title gen, memory extraction)
+# to avoid overwhelming the API. chat_stream is NOT gated by this.
+_background_semaphore = asyncio.Semaphore(3)
+
+
+async def _retry_completion(create_kwargs: dict, max_retries: int = 2) -> str:
+    """Call chat.completions.create with simple exponential backoff retry."""
+    for attempt in range(max_retries + 1):
+        try:
+            response = await client.chat.completions.create(**create_kwargs)
+            return response.choices[0].message.content or ""
+        except (RateLimitError, APIConnectionError, APIStatusError) as e:
+            if attempt == max_retries:
+                logger.warning("LLM call failed after %d retries: %s", max_retries, e)
+                return ""
+            wait = 2 ** attempt  # 1s, 2s
+            logger.info("LLM call retry %d/%d after %ds: %s", attempt + 1, max_retries, wait, e)
+            await asyncio.sleep(wait)
+        except Exception as e:
+            logger.warning("LLM call unexpected error: %s", e)
+            return ""
+    return ""
 
 
 async def chat_stream(
@@ -54,30 +78,25 @@ async def generate_completion(
     system_prompt: str | None = None,
 ) -> str:
     """Non-streaming completion for internal use (memory extraction, etc.)."""
-    model = settings.llm_model
     messages: list[dict[str, str]] = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
-    try:
-        response = await client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=0.3,
-        )
-        return response.choices[0].message.content or ""
-    except Exception as e:
-        logger.warning("generate_completion failed: %s", e)
-        return ""
+
+    async with _background_semaphore:
+        return await _retry_completion({
+            "model": settings.llm_model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": 0.3,
+        })
 
 
 async def generate_title(user_msg: str, assistant_msg: str) -> str:
-    model = settings.llm_model
-    try:
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
+    async with _background_semaphore:
+        title = await _retry_completion({
+            "model": settings.llm_model,
+            "messages": [
                 {
                     "role": "system",
                     "content": "根据以下对话生成一个简短的中文标题（不超过15个字），只输出标题文本，不要加引号或其他标点。",
@@ -86,11 +105,8 @@ async def generate_title(user_msg: str, assistant_msg: str) -> str:
                 {"role": "assistant", "content": assistant_msg[:200]},
                 {"role": "user", "content": "请为这段对话生成一个简短标题。"},
             ],
-            max_tokens=30,
-            temperature=0.3,
-        )
-        title = response.choices[0].message.content.strip().strip("\"'""''《》")
-        return title[:50] if title else "新对话"
-    except Exception as e:
-        logger.warning("Title generation failed: %s", e)
-        return ""
+            "max_tokens": 30,
+            "temperature": 0.3,
+        })
+    title = title.strip().strip("\"'""''《》")
+    return title[:50] if title else "新对话"

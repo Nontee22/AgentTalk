@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-vue-next'
 import { getCharacter, createCharacter, updateCharacter } from '@/api/characters'
 import { uploadImage } from '@/api/upload'
 import { useToast } from '@/composables/useToast'
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import TagInput from '@/components/common/TagInput.vue'
 import type { CharacterCreate, CharacterUpdate } from '@/types/world'
@@ -32,6 +33,16 @@ const form = ref<CharacterCreate>({
   tags: [],
 })
 
+const initialFormSnapshot = ref('')
+
+const isDirty = computed(() => JSON.stringify(form.value) !== initialFormSnapshot.value)
+
+useUnsavedChanges(isDirty)
+
+function takeSnapshot() {
+  initialFormSnapshot.value = JSON.stringify(form.value)
+}
+
 onMounted(async () => {
   if (isEdit.value && characterId.value) {
     try {
@@ -56,6 +67,7 @@ onMounted(async () => {
   } else if (worldId.value) {
     resolvedWorldId.value = worldId.value
   }
+  takeSnapshot()
 })
 
 async function handleUpload(file: File) {
@@ -70,9 +82,11 @@ async function handleSubmit() {
   try {
     if (isEdit.value && characterId.value) {
       await updateCharacter(characterId.value, form.value as CharacterUpdate)
+      takeSnapshot()
       router.push({ name: 'world-detail', params: { id: resolvedWorldId.value } })
     } else {
       await createCharacter(resolvedWorldId.value, form.value)
+      takeSnapshot()
       router.push({ name: 'world-detail', params: { id: resolvedWorldId.value } })
     }
   } catch {

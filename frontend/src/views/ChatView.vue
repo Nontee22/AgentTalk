@@ -6,6 +6,7 @@ import { useConversationStore } from '@/stores/conversationStore'
 import { useStreamStore } from '@/stores/streamStore'
 import { useMemoryStore } from '@/stores/memoryStore'
 import { useEventStream } from '@/composables/useEventStream'
+import { useTypewriter } from '@/composables/useTypewriter'
 import { getCharacter } from '@/api/characters'
 import { getWorld } from '@/api/worlds'
 import { renderMarkdown } from '@/utils/markdown'
@@ -31,7 +32,30 @@ const pendingDeleteId = ref<string | null>(null)
 
 const conversationId = computed(() => route.params.conversationId as string)
 
-const streamingHtml = computed(() => renderMarkdown(streamStore.streamingContent))
+// Typewriter: buffer streaming content and release char-by-char
+const streamingSource = computed(() => streamStore.streamingContent)
+const { displayed: typewriterContent, flush: flushTypewriter } = useTypewriter(streamingSource, 2, 30)
+
+// Throttled markdown rendering (~12fps instead of ~33fps)
+const streamingHtml = ref('')
+let lastRenderTime = 0
+const RENDER_INTERVAL = 80
+
+watch(typewriterContent, (val) => {
+  const now = Date.now()
+  if (now - lastRenderTime >= RENDER_INTERVAL || !streamStore.streaming) {
+    streamingHtml.value = renderMarkdown(val)
+    lastRenderTime = now
+  }
+})
+
+// Flush typewriter when stream ends
+watch(() => streamStore.streaming, (val) => {
+  if (!val) {
+    flushTypewriter()
+    streamingHtml.value = renderMarkdown(typewriterContent.value)
+  }
+})
 
 const lastAssistantIndex = computed(() => {
   for (let i = convStore.messages.length - 1; i >= 0; i--) {
@@ -89,7 +113,7 @@ watch(
 )
 
 watch(
-  () => streamStore.streamingContent,
+  typewriterContent,
   () => {
     if (isNearBottom()) scrollToBottom()
   },

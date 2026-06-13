@@ -6,6 +6,7 @@ import { getWorld } from '@/api/worlds'
 import { useWorldStore } from '@/stores/worldStore'
 import { uploadImage } from '@/api/upload'
 import { useToast } from '@/composables/useToast'
+import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import TagInput from '@/components/common/TagInput.vue'
 import type { WorldBookCreate, WorldBookUpdate } from '@/types/world'
@@ -31,6 +32,18 @@ const form = ref<WorldBookCreate>({
 })
 
 const factionsText = ref('')
+const initialFormSnapshot = ref('')
+
+const isDirty = computed(() => {
+  const current = JSON.stringify(form.value) + factionsText.value
+  return current !== initialFormSnapshot.value
+})
+
+useUnsavedChanges(isDirty)
+
+function takeSnapshot() {
+  initialFormSnapshot.value = JSON.stringify(form.value) + factionsText.value
+}
 
 onMounted(async () => {
   if (isEdit.value && worldId.value) {
@@ -52,6 +65,7 @@ onMounted(async () => {
       router.back()
     }
   }
+  takeSnapshot()
 })
 
 async function handleUpload(file: File) {
@@ -74,9 +88,11 @@ async function handleSubmit() {
   try {
     if (isEdit.value && worldId.value) {
       await store.editWorld(worldId.value, data as WorldBookUpdate)
+      takeSnapshot()
       router.push({ name: 'world-detail', params: { id: worldId.value } })
     } else {
       const world = await store.addWorld(data)
+      takeSnapshot()
       router.push({ name: 'world-detail', params: { id: world.id } })
     }
   } catch {

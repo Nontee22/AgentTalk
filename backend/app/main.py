@@ -15,6 +15,10 @@ from app.api.upload import router as upload_router
 from app.api.worlds import router as worlds_router
 from app.core.config import PROJECT_ROOT, settings
 from app.core.database import engine, redis_client
+from app.services.embedding_service import close_client as close_embedding_client
+from app.services.task_tracker import shutdown_tasks
+
+logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = PROJECT_ROOT / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -23,10 +27,12 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if settings.jwt_secret == "dev-secret-change-me-in-production":
-        logging.getLogger(__name__).warning(
-            "⚠ JWT_SECRET is using default value! Set JWT_SECRET in .env for production."
+        logger.warning(
+            "JWT_SECRET is using default value! Set JWT_SECRET in .env for production."
         )
     yield
+    await shutdown_tasks()
+    await close_embedding_client()
     await engine.dispose()
     await redis_client.aclose()
 

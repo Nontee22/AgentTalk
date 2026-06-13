@@ -3,10 +3,11 @@ import logging
 import uuid
 from collections.abc import AsyncGenerator
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.config import settings
+from app.core.database import async_session_maker
 from app.models.character import Character
 from app.models.conversation import Conversation
 from app.models.message import Message
@@ -17,6 +18,7 @@ from app.services.stream_registry import (
     register_stream,
     unregister_stream,
 )
+from app.services.task_tracker import create_background_task
 from app.services.token_counter import estimate_tokens
 
 logger = logging.getLogger(__name__)
@@ -86,32 +88,50 @@ async def send_message_stream(
     finally:
         await unregister_stream(conversation_id)
 
-    full_response = "".join(response_parts)
-    if full_response:
-        assistant_msg = Message(
-            conversation_id=conversation_id,
-            role="assistant",
-            content=full_response,
-            token_count=estimate_tokens(full_response),
-        )
-        db.add(assistant_msg)
-        conversation.message_count += 1
-        await db.commit()
-
-        if conversation.message_count <= 3:
-            title = await generate_title(user_content, full_response)
-            if title:
-                conversation.title = title
-                await db.commit()
-
-        # Trigger async memory extraction (non-blocking)
-        if settings.memory_enabled:
-            from app.services.memory_trigger import maybe_extract_memories
-
-            asyncio.create_task(
-                maybe_extract_memories(
-                    user_id=conversation.user_id,
-                    character_id=conversation.character_id,
-                    conversation_id=conversation.id,
-                )
+        # Save assistant response even if client disconnected mid-stream
+        full_response = "".join(response_parts)
+        if full_response:
+            assistant_msg = Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=full_response,
+                token_count=estimate_tokens(full_response),
             )
+            db.add(assistant_msg)
+            conversation.message_count += 1
+            await db.commit()
+
+            if conversation.message_count <= 3:
+                create_background_task(
+                    _generate_title_background(conversation_id, user_content, full_response),
+                    name=f"title-{conversation_id}",
+                )
+
+            # Trigger async memory extraction (non-blocking)
+            if settings.memory_enabled:
+                from app.services.memory_trigger import maybe_extract_memories
+
+                create_background_task(
+                    maybe_extract_memories(
+                        user_id=conversation.user_id,
+                        character_id=conversation.character_id,
+                        conversation_id=conversation.id,
+                    ),
+                    name=f"memory-{conversation_id}",
+                )
+
+
+async def _generate_title_background(
+    conversation_id: uuid.UUID, user_content: str, full_response: str,
+) -> None:
+    """Generate conversation title in background with its own DB session."""
+    try:
+        title = await generate_title(user_content, full_response)
+        if title:
+            async with async_session_maker() as db:
+                conv = await db.get(Conversation, conversation_id)
+                if conv:
+                    conv.title = title
+                    await db.commit()
+    except Exception:
+        logger.exception("Background title generation failed: conv=%s", conversation_id)

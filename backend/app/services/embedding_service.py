@@ -1,30 +1,28 @@
 # -*- coding: utf-8 -*-
-"""Embedding service — calls the standalone embedding microservice via HTTP.
+"""Embedding service — loads SentenceTransformer locally.
 
-The microservice handles model loading and inference. This module is a thin
-HTTP client that preserves the original interface (generate_embedding /
-generate_embeddings) so callers (memory_service.py) need no changes.
+Provides generate_embedding / generate_embeddings for memory_service.py.
+Model is lazy-loaded on first call.
 """
 
 import logging
-
-import httpx
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_client: httpx.AsyncClient | None = None
+_model = None
 
 
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(
-            base_url=settings.embedding_service_url,
-            timeout=30.0,
-        )
-    return _client
+def _get_model():
+    global _model
+    if _model is None:
+        from sentence_transformers import SentenceTransformer
+
+        logger.info("Loading embedding model: %s ...", settings.memory_embedding_model)
+        _model = SentenceTransformer(settings.memory_embedding_model)
+        logger.info("Embedding model loaded.")
+    return _model
 
 
 async def generate_embedding(text: str) -> list[float]:
@@ -34,12 +32,15 @@ async def generate_embedding(text: str) -> list[float]:
 
 
 async def generate_embeddings(texts: list[str]) -> list[list[float]]:
-    """Batch embed multiple texts via the embedding microservice."""
+    """Batch embed multiple texts."""
     if not texts:
         return []
 
-    client = _get_client()
-    response = await client.post("/embed", json={"texts": texts})
-    response.raise_for_status()
-    data = response.json()
-    return data["vectors"]
+    model = _get_model()
+    embeddings = model.encode(texts, normalize_embeddings=True)
+    return embeddings.tolist()
+
+
+async def close_client() -> None:
+    """No-op for local model (kept for interface compatibility with main.py lifespan)."""
+    pass
