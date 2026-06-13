@@ -1,6 +1,7 @@
 import api from '@/api'
 import type { PaginatedResponse } from '@/types/common'
 import type {
+  TagCount,
   WorldBook,
   WorldBookCreate,
   WorldBookSummary,
@@ -34,4 +35,9 @@ export async function updateWorld(id: string, body: WorldBookUpdate): Promise<Wo
 
 export async function deleteWorld(id: string): Promise<void> {
   await api.delete(`/worlds/${id}`)
+}
+
+export async function getTags(): Promise<TagCount[]> {
+  const { data } = await api.get('/worlds/tags')
+  return data
 }

@@ -15,8 +15,6 @@ const auth = useAuthStore()
 const selectedTag = ref<string | null>(null)
 const searchQuery = ref((route.query.search as string) || '')
 
-const commonTags = ['奇幻', '科幻', '历史', '现实']
-
 function selectTag(tag: string | null) {
   selectedTag.value = tag
   loadWorlds()
@@ -37,7 +35,10 @@ watch(
   },
 )
 
-onMounted(loadWorlds)
+onMounted(() => {
+  store.fetchTags()
+  loadWorlds()
+})
 </script>
 
 <template>
@@ -60,17 +61,18 @@ onMounted(loadWorlds)
         全部
       </button>
       <button
-        v-for="tag in commonTags"
-        :key="tag"
+        v-for="t in store.tags"
+        :key="t.name"
         class="px-3 py-1.5 rounded-full text-sm transition-colors"
         :class="
-          selectedTag === tag
+          selectedTag === t.name
             ? 'bg-accent text-bg-deep'
             : 'bg-white/[0.06] text-text-secondary hover:bg-white/[0.1]'
         "
-        @click="selectTag(tag)"
+        @click="selectTag(t.name)"
       >
-        {{ tag }}
+        {{ t.name }}
+        <span class="ml-1 opacity-60">{{ t.count }}</span>
       </button>
     </div>
 

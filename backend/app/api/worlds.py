@@ -9,6 +9,7 @@ from app.core.permissions import check_world_permission
 from app.models.user import User
 from app.schemas.common import PaginatedResponse
 from app.schemas.world import (
+    TagCount,
     WorldBookCreate,
     WorldBookDetail,
     WorldBookSummary,
@@ -37,6 +38,14 @@ async def list_worlds(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/tags", response_model=list[TagCount])
+async def list_tags(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return [TagCount(**t) for t in await world_service.get_all_tags(db)]
 
 
 @router.get("/{world_id}", response_model=WorldBookDetail)

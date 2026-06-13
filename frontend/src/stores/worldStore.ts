@@ -1,15 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { getWorlds, getWorld, createWorld, updateWorld, deleteWorld } from '@/api/worlds'
+import { getWorlds, getWorld, createWorld, updateWorld, deleteWorld, getTags } from '@/api/worlds'
 import { getCharacters } from '@/api/characters'
-import type { WorldBook, WorldBookCreate, WorldBookSummary, WorldBookUpdate } from '@/types/world'
+import type { WorldBook, WorldBookCreate, WorldBookSummary, WorldBookUpdate, TagCount } from '@/types/world'
 import type { CharacterSummary } from '@/types/world'
 
 export const useWorldStore = defineStore('world', () => {
   const worlds = ref<WorldBookSummary[]>([])
   const currentWorld = ref<WorldBook | null>(null)
   const characters = ref<CharacterSummary[]>([])
+  const tags = ref<TagCount[]>([])
   const total = ref(0)
   const loading = ref(false)
 
@@ -26,6 +27,14 @@ export const useWorldStore = defineStore('world', () => {
       total.value = data.total
     } finally {
       loading.value = false
+    }
+  }
+
+  async function fetchTags() {
+    try {
+      tags.value = await getTags()
+    } catch {
+      tags.value = []
     }
   }
 
@@ -57,9 +66,11 @@ export const useWorldStore = defineStore('world', () => {
     worlds,
     currentWorld,
     characters,
+    tags,
     total,
     loading,
     fetchWorlds,
+    fetchTags,
     fetchWorldDetail,
     addWorld,
     editWorld,

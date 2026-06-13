@@ -27,6 +27,11 @@ export interface WorldBookSummary {
   created_at: string
 }
 
+export interface TagCount {
+  name: string
+  count: number
+}
+
 export interface WorldBookCreate {
   name: string
   description?: string

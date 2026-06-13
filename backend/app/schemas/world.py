@@ -28,6 +28,11 @@ class WorldBookUpdate(BaseModel):
     is_preset: bool | None = None
 
 
+class TagCount(BaseModel):
+    name: str
+    count: int
+
+
 class WorldBookSummary(BaseModel):
     id: uuid.UUID
     name: str

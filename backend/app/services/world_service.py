@@ -1,11 +1,24 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.character import Character
 from app.models.world import WorldBook
 from app.schemas.world import WorldBookCreate, WorldBookUpdate
+
+
+async def get_all_tags(db: AsyncSession) -> list[dict]:
+    """Aggregate all tags from world_books with usage count, sorted by popularity."""
+    result = await db.execute(
+        text(
+            "SELECT tag, COUNT(*) AS count "
+            "FROM world_books, jsonb_array_elements_text(tags) AS tag "
+            "GROUP BY tag "
+            "ORDER BY count DESC, tag"
+        )
+    )
+    return [{"name": row.tag, "count": row.count} for row in result.all()]
 
 
 async def get_worlds(
