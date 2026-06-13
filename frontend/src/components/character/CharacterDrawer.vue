@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Character } from '@/types/world'
 import { X, MessageCircle } from 'lucide-vue-next'
-import { useChatStore } from '@/stores/chatStore'
+import { useConversationStore } from '@/stores/conversationStore'
 import { useToast } from '@/composables/useToast'
 import FoldableSection from '@/components/common/FoldableSection.vue'
 import TagBadge from '@/components/common/TagBadge.vue'
@@ -18,7 +18,7 @@ defineEmits<{
 }>()
 
 const router = useRouter()
-const chatStore = useChatStore()
+const chatStore = useConversationStore()
 const { showToast } = useToast()
 const starting = ref(false)
 

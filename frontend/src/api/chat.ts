@@ -1,34 +1,8 @@
 import api from '@/api'
 import { refreshToken as apiRefresh } from '@/api/auth'
+import { ensureFreshToken } from '@/utils/auth'
 import type { PaginatedResponse } from '@/types/common'
 import type { ChatMessage, ChatStartResponse, ConversationSummary } from '@/types/chat'
-
-/**
- * Ensure we have a valid (non-expired) access token before SSE fetch.
- * Returns the token string or null if unauthenticated.
- */
-async function ensureFreshToken(): Promise<string | null> {
-  let token = localStorage.getItem('access_token')
-  if (!token) return null
-
-  // Decode JWT payload to check expiry
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    const expiresAt = payload.exp * 1000
-    // Refresh if token expires within 60 seconds
-    if (Date.now() > expiresAt - 60_000) {
-      const rt = localStorage.getItem('refresh_token')
-      if (!rt) return null
-      const res = await apiRefresh(rt)
-      localStorage.setItem('access_token', res.access_token)
-      localStorage.setItem('refresh_token', res.refresh_token)
-      token = res.access_token
-    }
-  } catch {
-    // If decode fails, just use current token
-  }
-  return token
-}
 
 export async function startChat(
   characterId: string,

@@ -2,7 +2,8 @@
 import { onMounted, ref, nextTick, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PanelRight } from 'lucide-vue-next'
-import { useChatStore } from '@/stores/chatStore'
+import { useConversationStore } from '@/stores/conversationStore'
+import { useStreamStore } from '@/stores/streamStore'
 import { useMemoryStore } from '@/stores/memoryStore'
 import { useEventStream } from '@/composables/useEventStream'
 import { getCharacter } from '@/api/characters'
@@ -17,7 +18,8 @@ import type { Character, WorldBook } from '@/types/world'
 
 const route = useRoute()
 const router = useRouter()
-const store = useChatStore()
+const convStore = useConversationStore()
+const streamStore = useStreamStore()
 const memoryStore = useMemoryStore()
 
 const character = ref<Character | null>(null)
@@ -29,11 +31,11 @@ const pendingDeleteId = ref<string | null>(null)
 
 const conversationId = computed(() => route.params.conversationId as string)
 
-const streamingHtml = computed(() => renderMarkdown(store.streamingContent))
+const streamingHtml = computed(() => renderMarkdown(streamStore.streamingContent))
 
 const lastAssistantIndex = computed(() => {
-  for (let i = store.messages.length - 1; i >= 0; i--) {
-    if (store.messages[i].role === 'assistant' && !store.messages[i].error) return i
+  for (let i = convStore.messages.length - 1; i >= 0; i--) {
+    if (convStore.messages[i].role === 'assistant' && !convStore.messages[i].error) return i
   }
   return -1
 })
@@ -47,9 +49,9 @@ function scrollToBottom() {
 }
 
 async function loadConversationData(convId: string) {
-  await store.loadMessages(convId)
+  await convStore.loadMessages(convId)
 
-  const conv = store.conversations.find((c) => c.id === convId)
+  const conv = convStore.conversations.find((c) => c.id === convId)
   if (conv) {
     character.value = await getCharacter(conv.character_id)
     world.value = await getWorld(conv.world_id)
@@ -58,12 +60,12 @@ async function loadConversationData(convId: string) {
 }
 
 watch(
-  () => store.messages.length,
+  () => convStore.messages.length,
   () => scrollToBottom(),
 )
 
 watch(
-  () => store.streamingContent,
+  () => streamStore.streamingContent,
   () => scrollToBottom(),
 )
 
@@ -75,7 +77,7 @@ watch(
 )
 
 onMounted(async () => {
-  await store.fetchConversations()
+  await convStore.fetchConversations()
   if (conversationId.value) {
     await loadConversationData(conversationId.value)
   }
@@ -95,7 +97,7 @@ async function handleSelectConversation(id: string) {
 }
 
 function handleSend(content: string) {
-  store.sendMessage(content)
+  streamStore.sendMessage(content)
   scrollToBottom()
 }
 
@@ -106,11 +108,11 @@ async function handleDeleteConversation(id: string) {
 
 async function confirmDelete() {
   if (!pendingDeleteId.value) return
-  await store.removeConversation(pendingDeleteId.value)
+  await convStore.removeConversation(pendingDeleteId.value)
   deleteConfirmOpen.value = false
   pendingDeleteId.value = null
-  if (store.conversations.length) {
-    router.push({ name: 'chat', params: { conversationId: store.conversations[0].id } })
+  if (convStore.conversations.length) {
+    router.push({ name: 'chat', params: { conversationId: convStore.conversations[0].id } })
   } else {
     router.push({ name: 'worlds' })
   }
@@ -124,7 +126,7 @@ function handleNewChat() {
 <template>
   <div class="h-[calc(100vh-3.5rem)] flex">
     <ConversationList
-      :conversations="store.conversations"
+      :conversations="convStore.conversations"
       :current-id="conversationId"
       @select="handleSelectConversation"
       @delete="handleDeleteConversation"
@@ -150,19 +152,19 @@ function handleNewChat() {
       <div v-if="conversationId" class="flex-1 flex flex-col min-h-0">
         <div ref="messagesContainer" class="flex-1 overflow-y-auto py-4 space-y-1">
           <ChatMessageComp
-            v-for="(msg, index) in store.messages"
+            v-for="(msg, index) in convStore.messages"
             :key="msg.id"
             :message="msg"
             :character-name="character?.name"
             :character-avatar="character?.avatar"
             :is-last-assistant="msg.role === 'assistant' && !msg.error && index === lastAssistantIndex"
-            :streaming="store.streaming"
-            @retry="store.retryLastMessage"
-            @regenerate="store.regenerateLastMessage"
-            @edit="(content: string) => store.editAndResend(msg.id, content)"
+            :streaming="streamStore.streaming"
+            @retry="streamStore.retryLastMessage"
+            @regenerate="streamStore.regenerateLastMessage"
+            @edit="(content: string) => streamStore.editAndResend(msg.id, content)"
           />
 
-          <div v-if="store.streaming" class="flex gap-3 px-4 py-2">
+          <div v-if="streamStore.streaming" class="flex gap-3 px-4 py-2">
             <div class="w-8 h-8 rounded-full overflow-hidden bg-bg-hover shrink-0">
               <img
                 v-if="character?.avatar"
@@ -185,9 +187,9 @@ function handleNewChat() {
         </div>
 
         <ChatInput
-          :streaming="store.streaming"
+          :streaming="streamStore.streaming"
           @send="handleSend"
-          @stop="store.stopStreaming"
+          @stop="streamStore.stopStreaming"
         />
       </div>
 

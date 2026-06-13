@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Pencil, Plus } from 'lucide-vue-next'
 import { useWorldStore } from '@/stores/worldStore'
 import { useAuthStore } from '@/stores/authStore'
-import { useChatStore } from '@/stores/chatStore'
+import { useConversationStore } from '@/stores/conversationStore'
 import { useToast } from '@/composables/useToast'
 import { getCharacter } from '@/api/characters'
 import WorldHero from '@/components/world/WorldHero.vue'
@@ -18,7 +18,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useWorldStore()
 const auth = useAuthStore()
-const chatStore = useChatStore()
+const chatStore = useConversationStore()
 const { showToast } = useToast()
 
 const drawerOpen = ref(false)

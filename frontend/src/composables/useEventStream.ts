@@ -1,5 +1,5 @@
 import { ref, onUnmounted } from 'vue'
-import { refreshToken as apiRefresh } from '@/api/auth'
+import { ensureFreshToken } from '@/utils/auth'
 
 export interface EventStreamCallbacks {
   onMemoryReady?: (data: { character_id: string }) => void
@@ -16,26 +16,6 @@ export function useEventStream(callbacks: EventStreamCallbacks) {
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let stopped = false
 
-  async function getToken(): Promise<string | null> {
-    let token = localStorage.getItem('access_token')
-    if (!token) return null
-
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      if (Date.now() > payload.exp * 1000 - 60_000) {
-        const rt = localStorage.getItem('refresh_token')
-        if (!rt) return null
-        const res = await apiRefresh(rt)
-        localStorage.setItem('access_token', res.access_token)
-        localStorage.setItem('refresh_token', res.refresh_token)
-        token = res.access_token
-      }
-    } catch {
-      // decode failed, use as-is
-    }
-    return token
-  }
-
   function dispatchEvent(eventType: string, data: any) {
     if (eventType === 'memory_ready' && callbacks.onMemoryReady) {
       callbacks.onMemoryReady(data)
@@ -45,7 +25,7 @@ export function useEventStream(callbacks: EventStreamCallbacks) {
   async function connect() {
     if (stopped) return
 
-    const token = await getToken()
+    const token = await ensureFreshToken()
     if (!token) {
       scheduleReconnect()
       return
