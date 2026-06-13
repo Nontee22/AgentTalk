@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     memory_extraction_min_messages: int = 4
     memory_extraction_context_messages: int = 10
 
+    # Embedding microservice
+    embedding_service_url: str = "http://localhost:8001"
+
     cors_origins: str = "http://localhost:5173"
 
     @property

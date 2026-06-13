@@ -1,70 +1,45 @@
 # -*- coding: utf-8 -*-
-"""Embedding service — lazy-loads sentence-transformers model for vector generation.
+"""Embedding service — calls the standalone embedding microservice via HTTP.
 
-NOTE: The model loads in the web process on first request (~2-5s, ~200MB RAM).
-For production, consider pre-loading in lifespan or offloading to a worker process.
+The microservice handles model loading and inference. This module is a thin
+HTTP client that preserves the original interface (generate_embedding /
+generate_embeddings) so callers (memory_service.py) need no changes.
 """
 
-import asyncio
 import logging
 
-from sentence_transformers import SentenceTransformer
+import httpx
 
-from app.core.config import settings, PROJECT_ROOT
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_model: SentenceTransformer | None = None
-_lock = asyncio.Lock()
+_client: httpx.AsyncClient | None = None
 
 
-def _resolve_model_path(model_name: str) -> str:
-    """If model_name is a relative path (starts with ./ or ..), resolve from PROJECT_ROOT."""
-    if model_name.startswith("./") or model_name.startswith(".."):
-        resolved = (PROJECT_ROOT / model_name).resolve()
-        return str(resolved)
-    return model_name
-
-
-async def _get_model() -> SentenceTransformer:
-    """Lazy load with async lock. First call downloads ~100MB model."""
-    global _model
-    if _model is None:
-        async with _lock:
-            if _model is None:
-                model_path = _resolve_model_path(settings.memory_embedding_model)
-                logger.info(
-                    "Loading embedding model: %s ...",
-                    model_path,
-                )
-                loop = asyncio.get_running_loop()
-                _model = await loop.run_in_executor(
-                    None,
-                    lambda: SentenceTransformer(model_path),
-                )
-                logger.info("Embedding model loaded successfully.")
-    return _model
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(
+            base_url=settings.embedding_service_url,
+            timeout=30.0,
+        )
+    return _client
 
 
 async def generate_embedding(text: str) -> list[float]:
     """Generate embedding vector for a single text string."""
-    model = await _get_model()
-    loop = asyncio.get_running_loop()
-    vector = await loop.run_in_executor(
-        None,
-        lambda: model.encode(text, normalize_embeddings=True).tolist(),
-    )
-    return vector
+    vectors = await generate_embeddings([text])
+    return vectors[0]
 
 
 async def generate_embeddings(texts: list[str]) -> list[list[float]]:
-    """Batch embed multiple texts."""
+    """Batch embed multiple texts via the embedding microservice."""
     if not texts:
         return []
-    model = await _get_model()
-    loop = asyncio.get_running_loop()
-    vectors = await loop.run_in_executor(
-        None,
-        lambda: model.encode(texts, normalize_embeddings=True).tolist(),
-    )
-    return vectors
+
+    client = _get_client()
+    response = await client.post("/embed", json={"texts": texts})
+    response.raise_for_status()
+    data = response.json()
+    return data["vectors"]

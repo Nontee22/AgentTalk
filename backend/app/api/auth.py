@@ -49,12 +49,12 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ):
     client_ip = get_client_ip(request)
-    login_limiter.check(client_ip)
+    await login_limiter.check(client_ip)
 
     try:
         user = await auth_service.login(db, data.username, data.password)
     except ValueError as e:
-        login_limiter.record(client_ip)
+        await login_limiter.record(client_ip)
         raise HTTPException(status_code=401, detail=str(e))
 
     return TokenResponse(

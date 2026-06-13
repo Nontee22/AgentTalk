@@ -19,7 +19,7 @@ from app.schemas.chat import (
     MessageOut,
 )
 from app.schemas.common import PaginatedResponse
-from app.services import chat_service
+from app.services import message_service, stream_service
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ async def start_chat(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        conversation, greeting = await chat_service.start_conversation(
+        conversation, greeting = await message_service.start_conversation(
             db, data.character_id, data.world_id, user_id=current_user.id
         )
     except ValueError as e:
@@ -67,7 +67,7 @@ async def send_message(
 
     async def event_stream():
         try:
-            async for token in chat_service.send_message_stream(
+            async for token in stream_service.send_message_stream(
                 db, conversation_id, data.content
             ):
                 yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
@@ -103,7 +103,7 @@ async def stop_generation(
 
     from app.services.stream_registry import cancel_stream
 
-    cancelled = cancel_stream(conversation_id)
+    cancelled = await cancel_stream(conversation_id)
     if not cancelled:
         raise HTTPException(status_code=404, detail="No active stream found")
     return {"status": "stopped"}
@@ -116,7 +116,7 @@ async def list_conversations(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    items, total = await chat_service.get_conversations(
+    items, total = await message_service.get_conversations(
         db, user_id=current_user.id, page=page, page_size=page_size
     )
     return PaginatedResponse(
@@ -137,7 +137,7 @@ async def get_conversation_messages(
 ):
     await _check_conversation_owner(db, conversation_id, current_user.id)
 
-    messages, total = await chat_service.get_messages(
+    messages, total = await message_service.get_messages(
         db, conversation_id, page, page_size
     )
     return PaginatedResponse(
@@ -156,6 +156,6 @@ async def delete_conversation(
 ):
     await _check_conversation_owner(db, conversation_id, current_user.id)
 
-    deleted = await chat_service.delete_conversation(db, conversation_id)
+    deleted = await message_service.delete_conversation(db, conversation_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
