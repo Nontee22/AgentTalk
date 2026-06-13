@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, nextTick, watch, computed } from 'vue'
+import { onMounted, onUnmounted, ref, nextTick, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { PanelRight } from 'lucide-vue-next'
 import { useConversationStore } from '@/stores/conversationStore'
@@ -48,6 +48,28 @@ function scrollToBottom() {
   })
 }
 
+function isNearBottom(): boolean {
+  if (!messagesContainer.value) return true
+  const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value
+  return scrollHeight - scrollTop - clientHeight < 100
+}
+
+function onScroll() {
+  if (!messagesContainer.value) return
+  if (messagesContainer.value.scrollTop < 100 && convStore.hasMore && !convStore.loadingMore) {
+    loadOlder()
+  }
+}
+
+async function loadOlder() {
+  const container = messagesContainer.value!
+  const prevHeight = container.scrollHeight
+  await convStore.loadOlderMessages()
+  nextTick(() => {
+    container.scrollTop = container.scrollHeight - prevHeight
+  })
+}
+
 async function loadConversationData(convId: string) {
   await convStore.loadMessages(convId)
 
@@ -61,12 +83,16 @@ async function loadConversationData(convId: string) {
 
 watch(
   () => convStore.messages.length,
-  () => scrollToBottom(),
+  () => {
+    if (isNearBottom()) scrollToBottom()
+  },
 )
 
 watch(
   () => streamStore.streamingContent,
-  () => scrollToBottom(),
+  () => {
+    if (isNearBottom()) scrollToBottom()
+  },
 )
 
 watch(
@@ -81,6 +107,11 @@ onMounted(async () => {
   if (conversationId.value) {
     await loadConversationData(conversationId.value)
   }
+  messagesContainer.value?.addEventListener('scroll', onScroll)
+})
+
+onUnmounted(() => {
+  messagesContainer.value?.removeEventListener('scroll', onScroll)
 })
 
 // SSE side-channel: listen for real-time events from backend
@@ -151,6 +182,9 @@ function handleNewChat() {
 
       <div v-if="conversationId" class="flex-1 flex flex-col min-h-0">
         <div ref="messagesContainer" class="flex-1 overflow-y-auto py-4 space-y-1">
+          <div v-if="convStore.loadingMore" class="text-center py-2 text-text-muted text-sm">
+            加载中...
+          </div>
           <ChatMessageComp
             v-for="(msg, index) in convStore.messages"
             :key="msg.id"

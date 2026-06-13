@@ -125,7 +125,7 @@ async def get_messages(
     result = await db.execute(
         select(Message)
         .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at)
+        .order_by(Message.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     )

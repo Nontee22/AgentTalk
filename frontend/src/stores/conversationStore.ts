@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 import {
   startChat,
@@ -15,6 +15,12 @@ export const useConversationStore = defineStore('conversation', () => {
   const messages = ref<ChatMessage[]>([])
   const loading = ref(false)
 
+  // Pagination state
+  const currentPage = ref(1)
+  const totalMessages = ref(0)
+  const hasMore = computed(() => currentPage.value * 50 < totalMessages.value)
+  const loadingMore = ref(false)
+
   async function fetchConversations() {
     conversations.value = await getConversations()
   }
@@ -24,9 +30,27 @@ export const useConversationStore = defineStore('conversation', () => {
     loading.value = true
     try {
       const data = await getMessages(conversationId)
-      messages.value = data.items
+      // Backend returns newest first (DESC), reverse for chronological display
+      messages.value = [...data.items].reverse()
+      currentPage.value = data.page
+      totalMessages.value = data.total
     } finally {
       loading.value = false
+    }
+  }
+
+  async function loadOlderMessages() {
+    if (!hasMore.value || loadingMore.value || !currentConversationId.value) return
+    loadingMore.value = true
+    try {
+      const nextPage = currentPage.value + 1
+      const data = await getMessages(currentConversationId.value, nextPage)
+      // Reverse and prepend older messages to the beginning
+      messages.value = [...data.items.reverse(), ...messages.value]
+      currentPage.value = nextPage
+      totalMessages.value = data.total
+    } finally {
+      loadingMore.value = false
     }
   }
 
@@ -35,6 +59,8 @@ export const useConversationStore = defineStore('conversation', () => {
     currentConversationId.value = result.conversation_id
 
     messages.value = []
+    currentPage.value = 1
+    totalMessages.value = 0
     if (result.greeting_message) {
       messages.value.push(result.greeting_message)
     }
@@ -49,6 +75,8 @@ export const useConversationStore = defineStore('conversation', () => {
     if (currentConversationId.value === id) {
       currentConversationId.value = null
       messages.value = []
+      currentPage.value = 1
+      totalMessages.value = 0
     }
   }
 
@@ -61,8 +89,11 @@ export const useConversationStore = defineStore('conversation', () => {
     currentConversationId,
     messages,
     loading,
+    hasMore,
+    loadingMore,
     fetchConversations,
     loadMessages,
+    loadOlderMessages,
     createConversation,
     removeConversation,
     pushMessage,
