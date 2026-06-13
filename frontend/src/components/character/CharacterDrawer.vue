@@ -18,7 +18,7 @@ defineEmits<{
 }>()
 
 const router = useRouter()
-const chatStore = useConversationStore()
+const conversationStore = useConversationStore()
 const { showToast } = useToast()
 const starting = ref(false)
 
@@ -26,7 +26,7 @@ async function startChat() {
   if (starting.value) return
   starting.value = true
   try {
-    const convId = await chatStore.createConversation(
+    const convId = await conversationStore.createConversation(
       props.character.id,
       props.character.world_id,
     )

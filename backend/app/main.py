@@ -15,7 +15,6 @@ from app.api.upload import router as upload_router
 from app.api.worlds import router as worlds_router
 from app.core.config import PROJECT_ROOT, settings
 from app.core.database import engine, redis_client
-from app.services.embedding_service import close_client as close_embedding_client
 from app.services.task_tracker import shutdown_tasks
 
 logger = logging.getLogger(__name__)
@@ -32,7 +31,6 @@ async def lifespan(app: FastAPI):
         )
     yield
     await shutdown_tasks()
-    await close_embedding_client()
     await engine.dispose()
     await redis_client.aclose()
 

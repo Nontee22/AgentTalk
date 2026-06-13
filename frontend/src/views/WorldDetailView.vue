@@ -18,7 +18,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useWorldStore()
 const auth = useAuthStore()
-const chatStore = useConversationStore()
+const conversationStore = useConversationStore()
 const { showToast } = useToast()
 
 const drawerOpen = ref(false)
@@ -52,7 +52,7 @@ async function openDrawer(characterId: string) {
 async function handleStartChat(characterId: string) {
   if (!store.currentWorld) return
   try {
-    const convId = await chatStore.createConversation(characterId, store.currentWorld.id)
+    const convId = await conversationStore.createConversation(characterId, store.currentWorld.id)
     router.push({ name: 'chat', params: { conversationId: convId } })
   } catch (err: any) {
     showToast(err.response?.data?.detail || '创建对话失败', 'error')
