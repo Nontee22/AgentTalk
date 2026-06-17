@@ -32,3 +32,4 @@ Thumbs.db
 uploads/
 *.log
 models/bge-small-zh-v1.5
+/doc
