@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-chat"
     llm_max_tokens: int = 2048
-    llm_temperature: float = 0.85
+    llm_temperature: float = 0.95
     llm_max_context_tokens: int = 6000
 
     # Memory settings

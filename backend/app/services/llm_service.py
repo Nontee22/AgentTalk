@@ -43,6 +43,7 @@ async def chat_stream(
     messages: list[dict[str, str]],
 ) -> AsyncGenerator[str, None]:
     model = settings.llm_model
+    thinking_disabled = {"thinking": {"type": "disabled"}}
     try:
         response = await client.chat.completions.create(
             model=model,
@@ -50,6 +51,7 @@ async def chat_stream(
             max_tokens=settings.llm_max_tokens,
             temperature=settings.llm_temperature,
             stream=True,
+            extra_body=thinking_disabled,
         )
     except RateLimitError as e:
         logger.error("LLM rate limited: model=%s, %s", model, e)
@@ -89,6 +91,7 @@ async def generate_completion(
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": 0.3,
+            "extra_body": {"thinking": {"type": "enabled"}},
         })
 
 
@@ -107,6 +110,7 @@ async def generate_title(user_msg: str, assistant_msg: str) -> str:
             ],
             "max_tokens": 30,
             "temperature": 0.3,
+            "extra_body": {"thinking": {"type": "disabled"}},
         })
     title = title.strip().strip("\"'""''《》")
     return title[:50] if title else "新对话"
