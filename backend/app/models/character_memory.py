@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """CharacterMemory model — stores long-term memories per user-character pair."""
 
-# ============================================================
 # 记忆系统是 AgentTalk 的核心功能之一。
 # 它让 AI 角色能够在多轮对话中「记住」用户说过的重要信息，
 # 并在后续对话中自然地运用这些记忆，而不是每次对话都「失忆」。
@@ -12,7 +11,6 @@
 #
 # 每条记忆都关联到特定的 (用户, 角色) 对，
 # 并且通过向量（embedding）做语义搜索，而非关键词匹配。
-# ============================================================
 
 import uuid
 from datetime import datetime
